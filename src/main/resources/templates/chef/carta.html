@@ -1,9 +1,97 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="es">
 <head>
-    <meta charset="UTF-8"><title>Title</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel Chef - Carta</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-light">
 
+<!-- Cabecera provisional. Cuando Persona 6 tenga el layout, sustituir por: <div th:replace="~{layout :: header}"></div> -->
+<nav class="navbar navbar-dark bg-dark mb-4">
+    <div class="container">
+        <span class="navbar-brand">Sabor del Himalaya · Panel Chef</span>
+        <form th:action="@{/auth/logout}" method="post" class="m-0">
+            <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
+        </form>
+    </div>
+</nav>
+
+<main class="container">
+
+    <!-- Mensajes tras guardar el menú o si ya estaba configurado -->
+    <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}">Mensaje</div>
+
+    <div class="row g-4">
+
+        <!-- P14 (izquierda): Carta del restaurante, solo lectura (US-12) -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h4 mb-3">Carta del restaurante</h2>
+
+                    <!-- Pestañas por categoría (CA12.1) -->
+                    <ul class="nav nav-pills mb-3" role="tablist">
+                        <li class="nav-item" role="presentation" th:each="seccion, st : ${carta}">
+                            <button class="nav-link" type="button" role="tab" data-bs-toggle="pill"
+                                    th:classappend="${st.first} ? 'active'"
+                                    th:attr="data-bs-target='#cat-' + ${st.index}"
+                                    th:text="${seccion.key}">Categoría</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade" role="tabpanel"
+                             th:each="seccion, st : ${carta}"
+                             th:id="'cat-' + ${st.index}"
+                             th:classappend="${st.first} ? 'show active'">
+
+                            <p th:if="${#lists.isEmpty(seccion.value)}" class="text-muted">
+                                No hay platos en esta categoría.
+                            </p>
+
+                            <!-- CA12.2: nombre, descripción y precio de cada plato -->
+                            <ul class="list-group" th:unless="${#lists.isEmpty(seccion.value)}">
+                                <li class="list-group-item d-flex justify-content-between align-items-start"
+                                    th:each="plato : ${seccion.value}">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
+                                        <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
+                                    </div>
+                                    <span class="fw-semibold"
+                                          th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- P14 (derecha): Estado del menú diario de hoy -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h4 mb-3">Menú diario</h2>
+                    <p class="fw-semibold mb-2" th:text="${fechaHoy}">Fecha de hoy</p>
+
+                    <div th:if="${menuConfigurado}">
+                        <span class="badge text-bg-success">CONFIGURADO</span>
+                    </div>
+
+                    <div th:unless="${menuConfigurado}">
+                        <span class="badge text-bg-danger mb-3">NO CONFIGURADO</span>
+                        <a th:href="@{/chef/menu}" class="btn btn-primary w-100">Configurar menú</a>
+                    </div>
+                </div>
+            </div>
+            <!-- "Platos fuera de carta" + botón "Crear plato" (US-14) se añade en el Sprint 2 -->
+        </div>
+
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

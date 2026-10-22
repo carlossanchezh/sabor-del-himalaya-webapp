@@ -82,7 +82,7 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarTodosPlatos() {
-        // TODO: return platoRepository.findAll();
-        throw new UnsupportedOperationException("TODO");
+        // Usado por ChefController (US-13) para los desplegables del menú diario
+        return platoRepository.findAll();
     }
 }

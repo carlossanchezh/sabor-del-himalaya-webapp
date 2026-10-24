@@ -18,6 +18,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // comprobar si un login ya existe
     boolean existsByLogin(String login);
 
+    // compronbar si un correo ya existe
+    boolean existsByCorreo(String email);
+
     // buscar usuario por token de activación
     Optional<Usuario> findByTokenActivacion(String tokenActivacion);
 

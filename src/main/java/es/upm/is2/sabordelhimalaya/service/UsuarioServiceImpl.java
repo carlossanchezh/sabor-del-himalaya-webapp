@@ -4,13 +4,18 @@ import es.upm.is2.sabordelhimalaya.model.Usuario;
 
 import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
 
+import es.upm.is2.sabordelhimalaya.enums.Rol;
+
 import es.upm.is2.sabordelhimalaya.repository.UsuarioRepository;
+
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,11 +27,36 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Usuario registrar(RegistroUsuarioDTO dto) {
-        // TODO (US-01): Validar que el login no exista.
-        // Cifrar contraseña con passwordEncoder. (config/SecurityConfig)
-        // Generar token UUID, guardar usuario con estadoActivacion=false.
-        // Enviar correo.
-        throw new UnsupportedOperationException("TODO US-01");
+
+        // comprobar que el correo no está registrado
+        if (usuarioRepository.existsByCorreo(dto.getCorreo())) {
+            throw new OperacionNoPermitidaException("El correo ya está registrado.");
+        }
+
+        // comprobar que el login no está registrado
+        if (usuarioRepository.existsByLogin(dto.getLogin())) {
+            throw new OperacionNoPermitidaException("El nombre de usuario (login) ya está registrado. Prueba con otro.");
+        }
+
+        // Crear el usuario
+        Usuario usuario = new Usuario();
+        usuario.setNombre(dto.getNombre());
+        usuario.setDireccion(dto.getDireccion());
+        usuario.setCorreo(dto.getCorreo());
+        usuario.setLogin(dto.getLogin());
+
+        // Cifrar la contraseña
+        usuario.setContrasena(passwordEncoder.encode(dto.getContrasena()));
+
+        // Cuenta inactiva y rol de cliente por defecto
+        usuario.setEstadoActivacion(false);
+        usuario.setRol(Rol.CLIENTE);
+
+        // Generar el token de activación
+        usuario.setTokenActivacion(UUID.randomUUID().toString());
+
+        // Guardar en Base de Datos
+        return usuarioRepository.save(usuario);
     }
 
     @Override

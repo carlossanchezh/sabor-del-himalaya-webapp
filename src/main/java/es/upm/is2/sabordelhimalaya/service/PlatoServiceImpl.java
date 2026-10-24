@@ -10,8 +10,11 @@ import es.upm.is2.sabordelhimalaya.repository.PlatoRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -51,9 +54,35 @@ public class PlatoServiceImpl implements PlatoService {
     }
 
     @Override
+    @Transactional 
     public Plato anadirPlatoALaCarta(PlatoCreacionDTO dto) {
         // TODO (US-17): Crear Plato con estaEnCarta=true, esDelChef=false.
-        throw new UnsupportedOperationException("TODO US-17");
+        if(dto == null){
+            throw new IllegalArgumentException("Debes indicar los datos del plato.");
+        }
+        if(dto.getNombre() == null || dto.getNombre().isBlank()){
+            throw new IllegalArgumentException("El nombre del plato es obligatorio.");
+        }
+        if(dto.getDescripcion() == null || dto.getDescripcion().isBlank()){
+            throw new IllegalArgumentException("La descripcion del plato es obligatoria.");
+        }
+        if(dto.getPrecio() == null || dto.getPrecio().compareTo(BigDecimal.ZERO) <= 0){
+            throw new IllegalArgumentException("El precio del plato debe ser mayor que 0.");
+        }
+        if(dto.getCategoria() == null){
+            throw new IllegalArgumentException("Debes seleccionar la categoria del plato.");
+        }
+
+        //Plato visible en carta y creado por el dueño(no es el chef)
+        Plato plato = new Plato();
+        plato.setNombre(dto.getNombre().trim());
+        plato.setDescripcion(dto.getDescripcion().trim());
+        plato.setPrecio(dto.getPrecio().setScale(2,RoundingMode.HALF_UP));
+        plato.setCategoria(dto.getCategoria());
+        plato.setEstaEnCarta(true);
+        plato.setEsDelChef(false);
+
+        return platoRepository.save(plato);
     }
 
     @Override

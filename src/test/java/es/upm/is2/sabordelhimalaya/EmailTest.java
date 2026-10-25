@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SpringBootTest
-class EmailServiceTest {
+class EmailTest {
 
     @Autowired
     private JavaMailSender mailSender;

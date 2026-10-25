@@ -3,8 +3,10 @@ package es.upm.is2.sabordelhimalaya.controller;
 import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
 
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
+import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.service.UsuarioService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -80,18 +82,58 @@ public class AuthController {
 
     @GetMapping("/activar")
     public String activarCuenta(@RequestParam String token) {
-        // TODO (US-02): Llamar a UsuarioService.activarCuenta(token) y redirigir.
-        // TODO (P3): Crear el HTML
-        // TODO (P4): Crear el HTML
-        // P3: Muestra la pantalla con activación correcta la opción de ir a iniciar sesión
-        // P4: Muestra la pantalla con activación fallida y la opción de reenviar correo
-        return "auth/cuenta-activada";
-        //return "auth/enlace-invalido"; si falla
+
+        boolean exito = usuarioService.activarCuenta(token);
+
+        if (exito) {
+
+            return "auth/cuenta-activada";
+        } else {
+
+            return "auth/enlace-invalido";
+        }
     }
 
     @PostMapping("/reenviar")
-    public String reenviarActivacion(@RequestParam String login) {
-        // TODO (US-02): Llamar a UsuarioService.reenviarActivacion(login).
-        return "redirect:/auth/registro-exitoso";
+    public String reenviarActivacion(@RequestParam String logincorreo, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+
+        try {
+
+            usuarioService.reenviarActivacion(logincorreo);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Se ha enviado un nuevo enlace de activación a tu correo.");
+
+        } catch (OperacionNoPermitidaException e) {
+
+            // Si la cuenta ya está activada, mostramos un error
+            redirectAttributes.addFlashAttribute("mensajeError", e.getMessage());
+
+        } catch (RecursoNoEncontradoException e) {
+
+            // Si el usuario o el correo no existen en la BD, mostramos error
+            redirectAttributes.addFlashAttribute("mensajeError", e.getMessage());
+
+        } catch (Exception e) {
+
+            // Si hay un fallo externo o desconocido
+            redirectAttributes.addFlashAttribute("mensajeError", "No se ha podido enviar el correo. Inténtalo más tarde.");
+        }
+
+        // Obtenemos la URL desde la que se hizo la petición
+        String referer = request.getHeader("Referer");
+
+        // Volvemos a pasar los datos a la pantalla
+        redirectAttributes.addFlashAttribute("login", logincorreo);
+        redirectAttributes.addFlashAttribute("correo", logincorreo);
+
+        // Si la URL es válida y pertenece a nuestra app, volvemos a ella. Si no, al login.
+        if (referer != null && referer.contains("/auth/")) {
+            // Extraemos solo la ruta
+            String ruta = referer.substring(referer.indexOf("/auth/"));
+            return "redirect:" + ruta;
+        }
+
+        // Por defecto, volvemos al login
+        return "redirect:/auth/login";
+
     }
 }

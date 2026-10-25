@@ -1,5 +1,6 @@
 package es.upm.is2.sabordelhimalaya.service;
 
+import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 
 import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
@@ -53,23 +54,62 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuario.setRol(Rol.CLIENTE);
 
         // Generar el token de activación
-        usuario.setTokenActivacion(UUID.randomUUID().toString());
+        String token = UUID.randomUUID().toString();
+        usuario.setTokenActivacion(token);
 
         // Guardar en Base de Datos
-        return usuarioRepository.save(usuario);
+        Usuario usuarioSave = usuarioRepository.save(usuario);
+
+        // Enviamos el correo de activación
+        emailService.enviarCorreoActivacion(usuarioSave, token);
+
+        return usuarioSave;
     }
 
     @Override
     public boolean activarCuenta(String token) {
-        // TODO (US-02): Buscar usuario por token.
-        // Si existe, poner estadoActivacion=true, borrar token y guardar.
-        throw new UnsupportedOperationException("TODO US-02");
+
+        // Buscar al propietario del token
+        Usuario usuario = usuarioRepository.findByTokenActivacion(token).orElse(null);
+
+        if (usuario != null) {
+
+            // Al acceder al enlace válido, la cuenta queda activada
+            usuario.setEstadoActivacion(true);
+            usuario.setTokenActivacion(null); // Se borra el token para que no se pueda reutilizar
+            usuarioRepository.save(usuario);
+            return true;
+        }
+
+        return false;
     }
 
     @Override
-    public void reenviarActivacion(String login) {
-        // TODO (US-02): Buscar usuario, regenerar token, guardar y enviar correo.
-        throw new UnsupportedOperationException("TODO US-02");
+    public void reenviarActivacion(String logincorreo) {
+
+        Usuario usuario;
+
+        // Buscamos al usuario por su login o correo (si no existe excepción)
+        if (logincorreo.contains("@")) {
+            usuario = usuarioRepository.findByCorreo(logincorreo)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("No existe usuario con ese correo"));
+        } else {
+            usuario = usuarioRepository.findByLogin(logincorreo)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("No existe usuario con ese login"));
+        }
+
+        // Si el usuario ya ha activado su cuenta excepción
+        if (usuario.getEstadoActivacion()) {
+            throw new OperacionNoPermitidaException("La cuenta ya está activada. Puedes iniciar sesión.");
+        }
+        
+        // Generamos un nuevo token
+        String nuevoToken = java.util.UUID.randomUUID().toString();
+        usuario.setTokenActivacion(nuevoToken);
+        usuarioRepository.save(usuario);
+
+        // Volvemos a enviar el correo con el nuevo token
+        emailService.enviarCorreoActivacion(usuario, nuevoToken);
     }
 
     @Override

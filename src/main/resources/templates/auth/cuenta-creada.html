@@ -38,6 +38,10 @@
 
                     <h2 class="fw-bold mb-3" style="color: #198754;">¡Cuenta creada!</h2>
 
+                    <div th:if="${mensajeError}" class="alert alert-danger" th:text="${mensajeError}"></div>
+
+                    <div th:if="${mensajeExito}" class="alert alert-success" th:text="${mensajeExito}"></div>
+
                     <p class="text-muted">
                         Hemos enviado un enlace de activación a <br>
                         <strong th:text="${correo}">correo@ejemplo.com</strong>
@@ -51,7 +55,7 @@
 
                         <!-- Botón de reenviar -->
                         <form th:action="@{/auth/reenviar}" method="post" class="m-0 flex-fill">
-                            <input type="hidden" name="login" th:value="${login}">
+                            <input type="hidden" name="logincorreo" th:value="${login}">
                             <button type="submit" class="btn btn-secondary w-100">REENVIAR CORREO</button>
                         </form>
 

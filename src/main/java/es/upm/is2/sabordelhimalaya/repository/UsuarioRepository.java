@@ -15,10 +15,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     // buscar usuario por login
     Optional<Usuario> findByLogin(String login);
 
+    // buscar usuario por correo
+    Optional<Usuario> findByCorreo(String correo);
+
     // comprobar si un login ya existe
     boolean existsByLogin(String login);
 
-    // compronbar si un correo ya existe
+    // comprobar si un correo ya existe
     boolean existsByCorreo(String email);
 
     // buscar usuario por token de activación

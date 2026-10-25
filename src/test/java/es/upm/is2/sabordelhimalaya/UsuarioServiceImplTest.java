@@ -18,12 +18,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-// Pruebas unitarias de US-01 (Registro): UsuarioServiceImpl.registrar()
+// Pruebas unitarias de US-01 (Registro): UsuarioServiceImpl.registrar() , US-02 (Activación de cuenta): UsuarioServiceImpl.activarCuenta(), UsuarioServiceImpl.reenviarActivacion()
 @ExtendWith(MockitoExtension.class)
 class UsuarioServiceImplTest {
 
@@ -106,5 +108,79 @@ class UsuarioServiceImplTest {
 
         assertTrue(ex.getMessage().toLowerCase().contains("correo"));
         verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("CPU-02.1: Activar cuenta con token válido actualiza el estado y borra el token")
+    void activarCuenta_tokenValido_activaUsuario() {
+
+        Usuario usuarioInactivo = new Usuario();
+        usuarioInactivo.setIdUsuario(1L);
+        usuarioInactivo.setEstadoActivacion(false);
+        usuarioInactivo.setTokenActivacion("token-valido-123");
+
+        when(usuarioRepository.findByTokenActivacion("token-valido-123")).thenReturn(Optional.of(usuarioInactivo));
+
+        boolean resultado = usuarioService.activarCuenta("token-valido-123");
+
+        assertTrue(resultado);
+
+        // Capturamos el usuario para verificar que se ha modificado
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarioRepository).save(captor.capture());
+        Usuario usuarioGuardado = captor.getValue();
+
+        assertTrue(usuarioGuardado.getEstadoActivacion());
+        assertNull(usuarioGuardado.getTokenActivacion());
+    }
+
+    @Test
+    @DisplayName("CPU-02.2: Activar cuenta con token inválido devuelve false y no guarda")
+    void activarCuenta_tokenInvalido_devuelveFalse() {
+
+        when(usuarioRepository.findByTokenActivacion("token-falso")).thenReturn(Optional.empty());
+
+        boolean resultado = usuarioService.activarCuenta("token-falso");
+
+        assertFalse(resultado);
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("CPU-02.3: Reenviar activación a cuenta ya activa lanza excepción")
+    void reenviarActivacion_cuentaYaActiva_lanzaExcepcion() {
+
+        Usuario usuarioActivo = new Usuario();
+        usuarioActivo.setLogin("joselogin");
+        usuarioActivo.setEstadoActivacion(true);
+
+        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioActivo));
+
+        OperacionNoPermitidaException ex = assertThrows(
+                OperacionNoPermitidaException.class,
+                () -> usuarioService.reenviarActivacion("joselogin")
+        );
+
+        assertTrue(ex.getMessage().contains("ya está activada"));
+
+        // Verificamos que no se envía ningún correo
+        verify(emailService, never()).enviarCorreoActivacion(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("CPU-02.4: Reenviar activación a cuenta inactiva genera nuevo token y envía correo")
+    void reenviarActivacion_cuentaInactiva_enviaCorreo() {
+
+        Usuario usuarioInactivo = new Usuario();
+        usuarioInactivo.setLogin("joselogin");
+        usuarioInactivo.setEstadoActivacion(false);
+
+        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioInactivo));
+
+        usuarioService.reenviarActivacion("joselogin");
+
+        verify(usuarioRepository).save(usuarioInactivo);
+        assertNotNull(usuarioInactivo.getTokenActivacion()); // Debe tener un token nuevo
+        verify(emailService).enviarCorreoActivacion(eq(usuarioInactivo), anyString());
     }
 }

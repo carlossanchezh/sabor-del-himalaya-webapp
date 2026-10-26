@@ -136,4 +136,13 @@ public class AuthController {
         return "redirect:/auth/login";
 
     }
+
+    @GetMapping("/cuenta-inactiva")
+    public String mostrarCuentaInactiva(@RequestParam(required = false) String login, Model model) {
+
+        // Pasamos el login a la vista
+        model.addAttribute("login", login);
+
+        return "auth/cuenta-inactiva";
+    }
 }

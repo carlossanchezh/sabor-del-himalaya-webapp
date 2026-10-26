@@ -114,7 +114,7 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Usuario buscarPorLogin(String login) {
-        // TODO (US-03): return usuarioRepository.findByLogin(login).orElse(null);
+        // TODO: return usuarioRepository.findByLogin(login).orElse(null);
         throw new UnsupportedOperationException("TODO US-03");
     }
 

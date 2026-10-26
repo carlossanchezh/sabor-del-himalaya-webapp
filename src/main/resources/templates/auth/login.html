@@ -20,6 +20,16 @@
                 <div class="card-body p-4">
                     <h2 class="text-center mb-4">Iniciar Sesión</h2>
 
+                    <!-- Mensaje de error si falla el login -->
+                    <div th:if="${param.error}" class="alert alert-danger text-center">
+                        Usuario o contraseña incorrectos.
+                    </div>
+
+                    <!-- Mensaje de éxito si cierra sesión -->
+                    <div th:if="${param.logout}" class="alert alert-success text-center">
+                        Has cerrado sesión correctamente.
+                    </div>
+
                     <!-- Formulario de Login -->
                     <form th:action="@{/auth/login}" method="post">
                         <!-- Login -->

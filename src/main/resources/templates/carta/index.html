@@ -12,14 +12,23 @@
 <nav class="navbar navbar-dark bg-dark mb-4">
     <div class="container">
         <span class="navbar-brand">Sabor del Himalaya · Nuestra Carta</span>
-        <form th:action="@{/auth/logout}" method="post" class="m-0">
-            <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
-        </form>
+        <div class="d-flex gap-3 align-items-center">
+            <a class="link-light" th:href="@{/pedidos/mis-pedidos}">Mis pedidos</a>
+            <form th:action="@{/auth/logout}" method="post" class="m-0">
+                <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
+            </form>
+        </div>
     </div>
 </nav>
 
 <main class="container">
 
+    <!-- US-06: avisos al añadir productos al pedido -->
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+    <div class="alert alert-success" th:if="${mensaje}" th:text="${mensaje}"></div>
+
+    <div class="row g-4">
+    <div class="col-lg-8">
     <div class="card shadow-sm">
         <div class="card-body">
 
@@ -68,8 +77,12 @@
                                 <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
                                 <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
                             </div>
-                            <span class="fw-semibold"
-                                  th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+                            <div class="d-flex align-items-center gap-3 flex-shrink-0">
+                                <span class="fw-semibold"
+                                      th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+                                <!-- US-06 (CA6.3, CA6.4): añadir el plato o la bebida al pedido -->
+                                <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato})}"></form>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -101,7 +114,10 @@
                     </div>
 
                     <!-- CA5.1 - CA5.4: menú configurado -->
-                    <div th:if="${menuDisponible}">
+                    <!-- US-06 (CA6.1, CA6.2): el formulario añade el menú elegido al pedido -->
+                    <form th:if="${menuDisponible}" th:action="@{/pedidos/anadir-menu}" method="post">
+                        <input type="hidden" name="idMenuDiario" th:value="${menu.idMenuDiario}">
+                        <input type="hidden" name="cantidad" value="1">
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
@@ -122,7 +138,7 @@
                                 <div class="p-3 bg-body-tertiary rounded h-100">
                                     <h3 class="h6">Entrantes</h3>
                                     <label class="form-check" th:each="plato : ${entrantesMenu}">
-                                        <input class="form-check-input" type="radio" name="idEntrante"
+                                        <input class="form-check-input" type="radio" name="idEntrante" required
                                                th:value="${plato.idPlato}">
                                         <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
                                     </label>
@@ -134,7 +150,7 @@
                                 <div class="p-3 bg-body-tertiary rounded h-100">
                                     <h3 class="h6">Platos principales</h3>
                                     <label class="form-check" th:each="plato : ${principalesMenu}">
-                                        <input class="form-check-input" type="radio" name="idPrincipal"
+                                        <input class="form-check-input" type="radio" name="idPrincipal" required
                                                th:value="${plato.idPlato}">
                                         <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
                                     </label>
@@ -145,12 +161,12 @@
                             <div class="col-md-6">
                                 <div class="p-3 bg-body-tertiary rounded h-100">
                                     <h3 class="h6">Bebida</h3>
-                                    <select class="form-select" name="idBebida">
+                                    <select class="form-select" name="idBebida" required>
                                         <option value="">Elige una bebida</option>
                                         <option th:each="bebida : ${carta['Bebidas']}"
                                                 th:value="${bebida.idPlato}" th:text="${bebida.nombre}">Bebida</option>
                                     </select>
-                                    <small class="text-muted">Las bebidas no están incluidas en el precio del menú.</small>
+                                    <small class="text-muted">La bebida está incluida en el precio del menú.</small>
                                 </div>
                             </div>
 
@@ -159,7 +175,7 @@
                                 <div class="p-3 bg-body-tertiary rounded h-100">
                                     <h3 class="h6">Postres</h3>
                                     <label class="form-check" th:each="plato : ${postresMenu}">
-                                        <input class="form-check-input" type="radio" name="idPostre"
+                                        <input class="form-check-input" type="radio" name="idPostre" required
                                                th:value="${plato.idPlato}">
                                         <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
                                     </label>
@@ -167,11 +183,24 @@
                             </div>
 
                         </div>
-                    </div>
+
+                        <!-- Solo se puede pedir el menú de hoy (los de otros días se pueden consultar) -->
+                        <button type="submit" class="btn btn-success w-100 mt-3"
+                                th:if="${fechaMenu.equals(#temporals.createToday())}">Añadir menú al pedido</button>
+                        <p class="text-muted small mt-3 mb-0"
+                           th:unless="${fechaMenu.equals(#temporals.createToday())}">Solo se puede pedir el menú del día de hoy.</p>
+                    </form>
                 </div>
 
             </div>
         </div>
+    </div>
+    </div>
+
+    <!-- US-06 (CA6.5): productos seleccionados e importe acumulado -->
+    <aside class="col-lg-4">
+        <div th:replace="~{pedidos/fragmentos :: miPedido}"></div>
+    </aside>
     </div>
 
 </main>

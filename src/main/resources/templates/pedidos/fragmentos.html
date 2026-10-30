@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<!--
+    Fragmentos del carrito (US-06) para usar en carta/index.html (P5/P6):
+
+    1) Botón "+ Añadir" de cada plato o bebida de la carta (CA6.3, CA6.4):
+         <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato})}"></form>
+
+    2) Formulario del menú del día (CA6.1, CA6.2). Las listas son de Plato:
+         <form th:replace="~{pedidos/fragmentos :: formAnadirMenu(${menu}, ${entrantesMenu}, ${principalesMenu}, ${postresMenu}, ${bebidas})}"></form>
+       - menu: el MenuDiario de hoy
+       - entrantesMenu / principalesMenu / postresMenu: platos de las opciones del menú de hoy
+       - bebidas: bebidas de la carta
+
+    3) Panel lateral "Mi pedido" con productos e importe acumulado (CA6.5). No necesita nada del
+       controlador: CarritoModelAdvice añade "resumenCarrito" a las vistas de CartaController.
+         <div th:replace="~{pedidos/fragmentos :: miPedido}"></div>
+
+    Los errores al añadir llegan como flash "error" (y "errorCarrito" si se ha tenido que vaciar el carrito):
+         <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+-->
+<body>
+
+<form th:fragment="botonAnadirPlato(plato)" th:action="@{/pedidos/anadir-plato}" method="post" class="d-inline">
+    <input type="hidden" name="idPlato" th:value="${plato.idPlato}">
+    <input type="hidden" name="cantidad" value="1">
+    <button type="submit" class="btn btn-success btn-sm"
+            th:aria-label="'Añadir ' + ${plato.nombre} + ' al pedido'">+ Añadir</button>
+</form>
+
+<form th:fragment="formAnadirMenu(menu, entrantes, principales, postres, bebidas)"
+      th:action="@{/pedidos/anadir-menu}" method="post">
+    <input type="hidden" name="idMenuDiario" th:value="${menu.idMenuDiario}">
+    <input type="hidden" name="cantidad" value="1">
+
+    <div class="row g-3">
+        <fieldset class="col-md-4">
+            <legend class="h6">Entrantes</legend>
+            <div class="form-check" th:each="plato, it : ${entrantes}">
+                <input class="form-check-input" type="radio" name="idEntrante" required
+                       th:id="'menu-entrante-' + ${plato.idPlato}" th:value="${plato.idPlato}" th:checked="${it.first}">
+                <label class="form-check-label" th:for="'menu-entrante-' + ${plato.idPlato}" th:text="${plato.nombre}">Ensalada</label>
+            </div>
+        </fieldset>
+        <fieldset class="col-md-4">
+            <legend class="h6">Principales</legend>
+            <div class="form-check" th:each="plato, it : ${principales}">
+                <input class="form-check-input" type="radio" name="idPrincipal" required
+                       th:id="'menu-principal-' + ${plato.idPlato}" th:value="${plato.idPlato}" th:checked="${it.first}">
+                <label class="form-check-label" th:for="'menu-principal-' + ${plato.idPlato}" th:text="${plato.nombre}">Merluza</label>
+            </div>
+        </fieldset>
+        <fieldset class="col-md-4">
+            <legend class="h6">Postres</legend>
+            <div class="form-check" th:each="plato, it : ${postres}">
+                <input class="form-check-input" type="radio" name="idPostre" required
+                       th:id="'menu-postre-' + ${plato.idPlato}" th:value="${plato.idPlato}" th:checked="${it.first}">
+                <label class="form-check-label" th:for="'menu-postre-' + ${plato.idPlato}" th:text="${plato.nombre}">Flan</label>
+            </div>
+        </fieldset>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 my-3">
+        <label for="menu-bebida" class="form-label mb-0">Bebida:</label>
+        <select id="menu-bebida" name="idBebida" class="form-select w-auto" required>
+            <option th:each="bebida : ${bebidas}" th:value="${bebida.idPlato}" th:text="${bebida.nombre}">Agua mineral</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-success w-100">Añadir menú al pedido</button>
+</form>
+
+<div th:fragment="miPedido" class="card">
+    <div class="card-body">
+        <h2 class="h4">Mi pedido</h2>
+        <div class="alert alert-warning small" th:if="${errorCarrito}" th:text="${errorCarrito}"></div>
+
+        <div class="text-center text-muted py-4" th:if="${resumenCarrito.estaVacio()}">
+            <p class="mb-1">Tu pedido está vacío</p>
+            <p class="small mb-0">Añade platos de la carta o un menú del día.</p>
+        </div>
+
+        <ul class="list-unstyled mb-3" th:unless="${resumenCarrito.estaVacio()}">
+            <li class="d-flex justify-content-between small py-1" th:each="linea : ${resumenCarrito.lineas}">
+                <span>
+                    <span th:text="${linea.cantidad} + '× ' + ${linea.nombre}">2× Croquetas caseras</span>
+                    <span class="d-block text-muted" th:if="${linea.detalle}" th:text="${linea.detalle}"></span>
+                </span>
+                <span th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">16,00 €</span>
+            </li>
+        </ul>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-bold">Total</span>
+            <span class="fs-4 text-success"
+                  th:text="${#numbers.formatDecimal(resumenCarrito.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+        </div>
+        <a class="btn btn-success w-100" th:href="@{/pedidos/revisar}" th:unless="${resumenCarrito.estaVacio()}">Revisar pedido</a>
+        <button type="button" class="btn btn-secondary w-100" disabled th:if="${resumenCarrito.estaVacio()}">Revisar pedido</button>
+    </div>
+</div>
+
+</body>
+</html>

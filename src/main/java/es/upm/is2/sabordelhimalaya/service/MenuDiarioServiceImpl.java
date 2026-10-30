@@ -45,8 +45,14 @@ public class MenuDiarioServiceImpl implements MenuDiarioService {
 
     @Override
     public Optional<MenuDiario> consultarMenuDeFecha(LocalDate fecha) {
-        // TODO (US-05): return menuDiarioRepository.findByFecha(fecha);
-        throw new UnsupportedOperationException("TODO US-05");
+        // US-05: menú diario configurado para la fecha consultada (vacío si no hay)
+        return menuDiarioRepository.findByFecha(fecha);
+    }
+
+    @Override
+    public List<MenuDiarioOpcion> listarOpcionesDeMenu(Long idMenuDiario) {
+        // US-05: opciones (entrantes, principales y postres) del menú consultado
+        return menuDiarioOpcionRepository.findByMenuDiarioIdMenuDiario(idMenuDiario);
     }
 
     // US-13: Chef configurar los platos del menú diario

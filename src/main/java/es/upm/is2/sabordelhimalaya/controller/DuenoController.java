@@ -62,9 +62,15 @@ public class DuenoController {
 
 
     @PostMapping("/platos/{id}/anadir-existente")
-    public String anadirPlatoExistente(@PathVariable Long id) {
+    public String anadirPlatoExistente(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         // TODO (US-17): Llamar a PlatoService.anadirPlatoExistenteALaCarta(id).
         // P20: Añadir a la carta un plato que ya existía en el sistema
+        try {
+            Plato plato = platoService.anadirPlatoExistenteALaCarta(id);
+            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + plato.getNombre() + "' añadido de nuevo a la carta.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
+        }
         return "redirect:/dueno/panel";
     }
 
@@ -96,6 +102,7 @@ public class DuenoController {
         model.addAttribute("platos", platoService.listarCarta().stream()
         .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());
         model.addAttribute("categorias", CategoriaPlato.values());
-
+        model.addAttribute("platosRetirados", platoService.listarPlatosRetiradosDeLaCarta().stream()
+        .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());
     }
 }

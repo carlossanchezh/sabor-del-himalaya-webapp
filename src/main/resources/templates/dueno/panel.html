@@ -22,13 +22,14 @@
 
     <!-- Mensaje tras añadir un plato -->
     <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}">Mensaje</div>
+    <div th:if="${errorCarta}" class="alert alert-danger" th:text="${errorCarta}">Error</div>
 
     <!-- P18: Carta del restaurante (US-15) -->
     <div class="card shadow-sm">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="h4 mb-0">Carta del restaurante</h2>
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
                     + Añadir plato
                 </button>
             </div>
@@ -60,6 +61,42 @@
         </div>
     </div>
 </main>
+
+<!-- P20: Pop-up con los platos retirados y la opción de crear uno nuevo (Issue #22) -->
+<div class="modal fade" id="modalAnadirPlato" tabindex="-1" aria-labelledby="tituloAnadirPlato" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5" id="tituloAnadirPlato">Añadir plato a la carta</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p th:if="${#lists.isEmpty(platosRetirados)}" class="text-muted mb-0">No hay platos retirados de la carta.</p>
+
+                <ul class="list-group" th:unless="${#lists.isEmpty(platosRetirados)}">
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-3"
+                        th:each="retirado : ${platosRetirados}">
+                        <div>
+                            <div class="fw-semibold" th:text="${retirado.nombre}">Nombre</div>
+                            <small class="text-muted"
+                                   th:text="${retirado.categoria + ' · ' + #numbers.formatDecimal(retirado.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">CATEGORIA · 0,00 €</small>
+                        </div>
+                        <form th:action="@{/dueno/platos/{id}/anadir-existente(id=${retirado.idPlato})}" method="post" class="m-0">
+                            <button type="submit" class="btn btn-outline-success btn-sm">Añadir</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
+                    + Crear plato nuevo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- P20/P21: Pop-up para añadir un plato nuevo a la carta (US-17) -->
 <div class="modal fade" id="modalNuevoPlato" tabindex="-1" aria-labelledby="tituloNuevoPlato" aria-hidden="true">

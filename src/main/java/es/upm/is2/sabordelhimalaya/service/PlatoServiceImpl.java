@@ -6,6 +6,7 @@ import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.dto.PlatoCreacionDTO;
 import es.upm.is2.sabordelhimalaya.dto.PlatoModificacionDTO;
 
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 
 import es.upm.is2.sabordelhimalaya.repository.PlatoRepository;
@@ -44,9 +45,8 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarPlatosRetiradosDeLaCarta() {
-        // TODO (US-18): return
-        // platoRepository.findByEstaEnCartaFalseAndEsDelChefFalse();
-        throw new UnsupportedOperationException("TODO US-18");
+        // US-17: platos retirados de la carta (los del chef no aparecen)
+        return platoRepository.findByEstaEnCartaFalseAndEsDelChefFalse();
     }
 
     @Override
@@ -59,7 +59,7 @@ public class PlatoServiceImpl implements PlatoService {
     @Override
     @Transactional
     public Plato anadirPlatoALaCarta(PlatoCreacionDTO dto) {
-        // TODO (US-17): Crear Plato con estaEnCarta=true, esDelChef=false.
+        // (US-17): Crear Plato con estaEnCarta=true, esDelChef=false.
         if (dto == null) {
             throw new IllegalArgumentException("Debes indicar los datos del plato.");
         }
@@ -89,9 +89,18 @@ public class PlatoServiceImpl implements PlatoService {
     }
 
     @Override
+    @Transactional
     public Plato anadirPlatoExistenteALaCarta(Long idPlato) {
-        // TODO (US-17): Buscar plato, poner estaEnCarta=true, guardar.
-        throw new UnsupportedOperationException("TODO US-17");
+        Plato plato = buscarPorId(idPlato);
+
+        if(plato.getEsDelChef()){
+            throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden añadir a la carta.");
+        }
+        if(plato.getEstaEnCarta()){
+            throw new IllegalArgumentException("El plato '" + plato.getNombre() + "' ya está en la carta.");
+        }
+        plato.setEstaEnCarta(true);
+        return platoRepository.save(plato);
     }
 
     @Override

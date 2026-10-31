@@ -2,6 +2,8 @@ package es.upm.is2.sabordelhimalaya;
 
 import es.upm.is2.sabordelhimalaya.dto.PlatoCreacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
+import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.repository.PlatoRepository;
 import es.upm.is2.sabordelhimalaya.service.PlatoServiceImpl;
@@ -15,6 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -130,5 +134,60 @@ class PlatoServiceImplTest {
     void anadirPlatoALaCarta_dtoNulo_lanzaError() {
         assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(null));
         verify(platoRepository, never()).save(any());
+    }
+
+    // Issue #22: volver a añadir un plato retirado
+    private Plato platoExistente(long id, boolean estaEnCarta, boolean esDelChef) {
+        return new Plato(id, "Plato " + id, "Descripción " + id, new BigDecimal("10.00"), CategoriaPlato.PRINCIPAL, estaEnCarta, esDelChef);
+    }
+
+    @Test
+    @DisplayName("CPU-17.9: Un plato retirado vuelve a estar en la carta")
+    void anadirPlatoExistente_retirado_vuelveALaCarta() {
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(platoExistente(1L, false, false)));
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Plato resultado = platoService.anadirPlatoExistenteALaCarta(1L);
+
+        assertTrue(resultado.getEstaEnCarta());
+        assertFalse(resultado.getEsDelChef());
+        verify(platoRepository).save(resultado);
+    }
+
+    @Test
+    @DisplayName("CPU-17.10: Rechaza añadir a la carta un plato del chef")
+    void anadirPlatoExistente_delChef_lanzaOperacionNoPermitida() {
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(platoExistente(2L, false, true)));
+
+        assertThrows(OperacionNoPermitidaException.class, () -> platoService.anadirPlatoExistenteALaCarta(2L));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-17.11: Rechaza añadir un plato que ya está en la carta")
+    void anadirPlatoExistente_yaEnCarta_lanzaError() {
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(platoExistente(3L, true, false)));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoExistenteALaCarta(3L));
+        assertTrue(ex.getMessage().contains("ya está en la carta"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-17.12: Lanza RecursoNoEncontrado si el plato no existe")
+    void anadirPlatoExistente_inexistente_lanzaRecursoNoEncontrado() {
+        when(platoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class, () -> platoService.anadirPlatoExistenteALaCarta(99L));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-17.13: La lista de retirados usa la consulta que excluye los platos del chef")
+    void listarPlatosRetirados_devuelveLosDelRepositorio() {
+        List<Plato> retirados = List.of(platoExistente(1L, false, false));
+        when(platoRepository.findByEstaEnCartaFalseAndEsDelChefFalse()).thenReturn(retirados);
+
+        assertEquals(retirados, platoService.listarPlatosRetiradosDeLaCarta());
     }
 }

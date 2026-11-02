@@ -1,13 +1,13 @@
 package es.upm.is2.sabordelhimalaya.controller;
 
-import es.upm.is2.sabordelhimalaya.dto.MenuDiarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.MenuDiarioDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.service.MenuDiarioService;
 import es.upm.is2.sabordelhimalaya.service.PlatoService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -27,70 +27,85 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChefController {
 
-    private static final DateTimeFormatter FORMATO_FECHA =
-            DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy", Locale.of("es", "ES"));
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy", Locale.of("es", "ES"));
 
     private final PlatoService platoService;
     private final MenuDiarioService menuDiarioService;
 
-    // US-12 / P14: Panel del chef (carta de solo lectura + estado del menú de hoy)
     @GetMapping("/carta")
     public String verCarta(Model model) {
-        // CA12.1 y CA12.3: carta agrupada por categorías, incluidas las bebidas
+
+        // Carta agrupada por categorías, incluidas las bebidas
         Map<String, List<Plato>> carta = new LinkedHashMap<>();
-        carta.put("Entrantes", platoService.listarCartaPorCategoria(CategoriaPlato.ENTRANTE));
-        carta.put("Principales", platoService.listarCartaPorCategoria(CategoriaPlato.PRINCIPAL));
-        carta.put("Postres", platoService.listarCartaPorCategoria(CategoriaPlato.POSTRE));
-        carta.put("Bebidas", platoService.listarCartaPorCategoria(CategoriaPlato.BEBIDA));
+        carta.put("Entrantes", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.ENTRANTE)));
+        carta.put("Principales", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.PRINCIPAL)));
+        carta.put("Postres", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.POSTRE)));
+        carta.put("Bebidas", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.BEBIDA)));
         model.addAttribute("carta", carta);
 
-        // Recuadro "Menú diario": el botón de configurar solo aparece si hoy no hay menú
+        // Sección de Menú diario (el botón de configurar solo aparece si hoy no hay menú)
         LocalDate hoy = LocalDate.now();
         model.addAttribute("fechaHoy", formatearFecha(hoy));
         model.addAttribute("menuConfigurado", menuDiarioService.consultarMenuDeFecha(hoy).isPresent());
         return "chef/carta";
     }
 
-    // US-13 / P15-P16: Formulario de configuración del menú diario
     @GetMapping("/menu")
-    public String configurarMenu(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
-                                 Model model, RedirectAttributes redirectAttributes) {
-        LocalDate dia = (fecha != null) ? fecha : LocalDate.now();
+    public String configurarMenu(Model model, RedirectAttributes redirectAttributes) {
 
-        if (menuDiarioService.consultarMenuDeFecha(dia).isPresent()) {
-            redirectAttributes.addFlashAttribute("mensaje", "El menú del " + formatearFecha(dia) + " ya está configurado.");
+        // Fecha del día de hoy
+        LocalDate hoy = LocalDate.now();
+
+        // Si ya existe un menú para hoy, no se puede volver a configurar
+        if (menuDiarioService.consultarMenuDeFecha(hoy).isPresent()) {
+
+            redirectAttributes.addFlashAttribute("mensaje", "El menú del " + formatearFecha(hoy) + " ya está configurado.");
             return "redirect:/chef/carta";
         }
 
+        // Creación del menú vacío para rellenarlo desde la interfáz
         MenuDiarioDTO menu = new MenuDiarioDTO();
-        menu.setFecha(dia);
+        menu.setFecha(hoy);
         model.addAttribute("menu", menu);
-        cargarDatosFormulario(model, dia);
+
+        // Carga la lista de platos seleccionables para configurar el menú
+        cargarDatosFormulario(model, hoy);
+
         return "chef/menu";
     }
 
-    // US-13: Guardar el menú configurado y publicarlo
     @PostMapping("/menu")
-    public String guardarMenu(@ModelAttribute("menu") MenuDiarioDTO menu, BindingResult bindingResult,
-                              Model model, RedirectAttributes redirectAttributes) {
-        LocalDate dia = (menu.getFecha() != null) ? menu.getFecha() : LocalDate.now();
+    public String guardarMenu(@Valid @ModelAttribute("menu") MenuDiarioDTO menu, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
 
+        // Fecha del día de hoy
+        LocalDate hoy = LocalDate.now();
+
+        // Se reactualiza la fecha del menú
+        menu.setFecha(hoy);
+
+        // Errores de binding
         if (bindingResult.hasErrors()) {
             model.addAttribute("error", "Los datos del formulario no son válidos. Revisa la selección.");
-            cargarDatosFormulario(model, dia);
+            cargarDatosFormulario(model, hoy);
             return "chef/menu";
         }
 
         try {
+
+            // Configuración del menú del día
             menuDiarioService.configurarMenu(menu);
+
         } catch (IllegalArgumentException e) {
+
             // Errores de validación (faltan platos, repetidos, categoría incorrecta, ya configurado...)
             model.addAttribute("error", e.getMessage());
-            cargarDatosFormulario(model, dia);
+            cargarDatosFormulario(model, hoy);
             return "chef/menu";
         }
 
-        redirectAttributes.addFlashAttribute("mensaje", "Menú del " + formatearFecha(dia) + " guardado y publicado.");
+        //Mensaje de éxito al configurar el menú
+        redirectAttributes.addFlashAttribute("mensaje", "Menú del " + formatearFecha(hoy) + " guardado y publicado.");
+
         return "redirect:/chef/carta";
     }
 
@@ -113,30 +128,63 @@ public class ChefController {
     // Métodos auxiliares
     // ----------------------------------------------------------------
 
-    // Listas de los desplegables: platos de la carta y platos fuera de carta (CA13.4) de cada categoría
-    private void cargarDatosFormulario(Model model, LocalDate dia) {
+    // Listas de los desplegables: platos de la carta y platos fuera de carta (creaciones del chef) de cada categoría
+    private void cargarDatosFormulario(Model model, LocalDate hoy) {
+
+        // Se cargan todos los platos del sistema
         List<Plato> todos = platoService.listarTodosPlatos();
 
-        model.addAttribute("entrantesCarta", filtrar(todos, CategoriaPlato.ENTRANTE, true));
-        model.addAttribute("entrantesFueraCarta", filtrar(todos, CategoriaPlato.ENTRANTE, false));
-        model.addAttribute("principalesCarta", filtrar(todos, CategoriaPlato.PRINCIPAL, true));
-        model.addAttribute("principalesFueraCarta", filtrar(todos, CategoriaPlato.PRINCIPAL, false));
-        model.addAttribute("postresCarta", filtrar(todos, CategoriaPlato.POSTRE, true));
-        model.addAttribute("postresFueraCarta", filtrar(todos, CategoriaPlato.POSTRE, false));
+        // Filtra y carga los platos seleccionables por cada categoría
 
-        model.addAttribute("fechaTexto", formatearFecha(dia));
+        // Entrantes: platos de la carta + platos fuera de carta del chef
+        model.addAttribute("entrantesCarta", filtrarCarta(todos, CategoriaPlato.ENTRANTE));
+        model.addAttribute("entrantesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.ENTRANTE));
+
+        // Principales: platos de la carta + platos fuera de carta del chef
+        model.addAttribute("principalesCarta", filtrarCarta(todos, CategoriaPlato.PRINCIPAL));
+        model.addAttribute("principalesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.PRINCIPAL));
+
+        // Postres: platos de la carta + platos fuera de carta del chef
+        model.addAttribute("postresCarta", filtrarCarta(todos, CategoriaPlato.POSTRE));
+        model.addAttribute("postresFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.POSTRE));
+
+        // Fecha formateada
+        model.addAttribute("fechaTexto", formatearFecha(hoy));
     }
 
-    private List<Plato> filtrar(List<Plato> platos, CategoriaPlato categoria, boolean enCarta) {
+    // Platos visibles en la carta (esta_en_carta=true) de una categoría
+    private List<Plato> filtrarCarta(List<Plato> platos, CategoriaPlato categoria) {
+
         return platos.stream()
                 .filter(p -> p.getCategoria() == categoria)
-                .filter(p -> Boolean.valueOf(enCarta).equals(p.getEstaEnCarta()))
+                .filter(p -> Boolean.TRUE.equals(p.getEstaEnCarta()))
                 .sorted(Comparator.comparing(Plato::getNombre))
                 .toList();
     }
 
+    // Platos fuera de carta creados por el chef (esta_en_carta=false Y es_del_chef=true) de una categoría
+    private List<Plato> filtrarFueraDeCartaDelChef(List<Plato> platos, CategoriaPlato categoria) {
+
+        return platos.stream()
+                .filter(p -> p.getCategoria() == categoria)
+                .filter(p -> !Boolean.TRUE.equals(p.getEstaEnCarta()))
+                .filter(p -> Boolean.TRUE.equals(p.getEsDelChef()))
+                .sorted(Comparator.comparing(Plato::getNombre))
+                .toList();
+    }
+
+    // Ordenar una lista de platos alfabéticamente por nombre
+    private List<Plato> ordenarPlatos(List<Plato> platos) {
+
+        return platos.stream()
+                .sorted(Comparator.comparing(Plato::getNombre))
+                .toList();
+    }
+
+    // Formatea una fecha como "EEEE, d 'de' MMMM 'de' yyyy" (primera letra mayúscula)
     private String formatearFecha(LocalDate fecha) {
+
         String texto = fecha.format(FORMATO_FECHA);
-        return Character.toUpperCase(texto.charAt(0)) + texto.substring(1); // "Jueves, 22 de octubre de 2026"
+        return Character.toUpperCase(texto.charAt(0)) + texto.substring(1);
     }
 }

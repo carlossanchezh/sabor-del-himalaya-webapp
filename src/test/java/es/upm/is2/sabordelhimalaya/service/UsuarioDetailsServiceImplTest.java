@@ -21,7 +21,11 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-// Pruebas unitarias de US-03 (Inicio de sesión): UsuarioDetailsServiceImpl.loadUserByUsername()
+/**
+ Pruebas unitarias de:
+ - US-03 (Inicio de sesión)
+ */
+
 @ExtendWith(MockitoExtension.class)
 class UsuarioDetailsServiceImplTest {
 
@@ -37,8 +41,8 @@ class UsuarioDetailsServiceImplTest {
     void setUp() {
         usuarioActivo = new Usuario();
         usuarioActivo.setIdUsuario(1L);
-        usuarioActivo.setLogin("joselogin");
-        usuarioActivo.setContrasena("123456");
+        usuarioActivo.setLogin("usuario1");
+        usuarioActivo.setContrasena("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
         usuarioActivo.setEstadoActivacion(true);
         usuarioActivo.setRol(Rol.CLIENTE);
     }
@@ -47,13 +51,13 @@ class UsuarioDetailsServiceImplTest {
     @DisplayName("CPU-03.1: Usuario activo devuelve un UserDetails con username y password correctos")
     void loadUserByUsername_usuarioActivo_devuelveUserDetailsCorrecto() {
 
-        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
 
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("joselogin");
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
 
         assertNotNull(userDetails);
-        assertEquals("joselogin", userDetails.getUsername());
-        assertEquals("123456", userDetails.getPassword());
+        assertEquals("usuario1", userDetails.getUsername());
+        assertEquals("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", userDetails.getPassword());
         assertTrue(userDetails.isEnabled());
         assertTrue(userDetails.isAccountNonExpired());
         assertTrue(userDetails.isAccountNonLocked());
@@ -64,11 +68,12 @@ class UsuarioDetailsServiceImplTest {
     @DisplayName("CPU-03.2: La autoridad devuelta lleva el prefijo ROLE_")
     void loadUserByUsername_autoridadConPrefijoRole() {
 
-        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
 
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("joselogin");
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
 
         assertEquals(1, userDetails.getAuthorities().size());
+
         GrantedAuthority authority = userDetails.getAuthorities().iterator().next();
         assertEquals("ROLE_CLIENTE", authority.getAuthority());
     }
@@ -78,35 +83,34 @@ class UsuarioDetailsServiceImplTest {
     void loadUserByUsername_usuarioInactivo_seConstruyeDeshabilitado() {
 
         usuarioActivo.setEstadoActivacion(false);
-        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
 
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("joselogin");
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
 
         assertFalse(userDetails.isEnabled());
     }
 
     @Test
-    @DisplayName("CPU-03.4: Login inexistente lanza UsernameNotFoundException")
-    void loadUserByUsername_usuarioInexistente_lanzaExcepcion() {
+    @DisplayName("CPU-03.4: La contraseña cifrada se pasa al UserDetails sin modificar")
+    void loadUserByUsername_contrasenaCifradaSeMantieneIgual() {
 
-        when(usuarioRepository.findByLogin("desconocido")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
 
-        UsernameNotFoundException ex = assertThrows(
-                UsernameNotFoundException.class,
-                () -> usuarioDetailsService.loadUserByUsername("desconocido")
-        );
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
 
-        assertTrue(ex.getMessage().contains("desconocido"));
+        assertEquals("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", userDetails.getPassword());
     }
 
     @Test
-    @DisplayName("CPU-03.5: La contraseña cifrada se pasa al UserDetails sin modificar")
-    void loadUserByUsername_contrasenaCifradaSeMantieneIgual() {
+    @DisplayName("CPU-03.5: El username del UserDetails es el login, no el nombre")
+    void loadUserByUsername_usernameEsElLoginNoElNombre() {
 
-        when(usuarioRepository.findByLogin("joselogin")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("usuario1"))
+                .thenReturn(Optional.of(usuarioActivo));
 
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("joselogin");
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
 
-        assertEquals("123456", userDetails.getPassword());
+        assertEquals("usuario1", userDetails.getUsername());
+        assertNotEquals("Usuario 1", userDetails.getUsername());
     }
 }

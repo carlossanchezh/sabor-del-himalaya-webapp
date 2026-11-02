@@ -3,8 +3,8 @@ package es.upm.is2.sabordelhimalaya.service;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.model.Plato;
 
-import es.upm.is2.sabordelhimalaya.dto.PlatoCreacionDTO;
-import es.upm.is2.sabordelhimalaya.dto.PlatoModificacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoModificacionDTO;
 
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
@@ -27,13 +27,13 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarCarta() {
-        // US-04: platos visibles en la carta (incluye las bebidas)
+        // Productos de la carta
         return platoRepository.findByEstaEnCartaTrue();
     }
 
     @Override
     public List<Plato> listarCartaPorCategoria(CategoriaPlato categoria) {
-        // US-04: platos visibles en la carta de una categoría concreta
+        // Productos de la carta de una categoría concreta
         return platoRepository.findByEstaEnCartaTrueAndCategoria(categoria);
     }
 
@@ -45,7 +45,7 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarPlatosRetiradosDeLaCarta() {
-        // US-17: platos retirados de la carta (los del chef no aparecen)
+        // Obtener los platos retirados de la carta
         return platoRepository.findByEstaEnCartaFalseAndEsDelChefFalse();
     }
 
@@ -59,7 +59,7 @@ public class PlatoServiceImpl implements PlatoService {
     @Override
     @Transactional
     public Plato anadirPlatoALaCarta(PlatoCreacionDTO dto) {
-        // (US-17): Crear Plato con estaEnCarta=true, esDelChef=false.
+
         if (dto == null) {
             throw new IllegalArgumentException("Debes indicar los datos del plato.");
         }
@@ -76,12 +76,24 @@ public class PlatoServiceImpl implements PlatoService {
             throw new IllegalArgumentException("Debes seleccionar la categoria del plato.");
         }
 
-        // Plato visible en carta y creado por el dueño(no es el chef)
+        // Validar que no existe un plato con ese nombre ya
+        boolean existePlato = platoRepository.findAll().stream()
+                .anyMatch(p -> p.getNombre().equalsIgnoreCase(dto.getNombre().trim()));
+
+        if (existePlato) {
+            throw new IllegalArgumentException("Ya existe un plato con el nombre '" + dto.getNombre().trim() + "'. Si estaba retirado, usa la opción 'Añadir plato' de la lista de retirados.");
+        }
+
+        // Crear nuevo plato
         Plato plato = new Plato();
+
+        // Añadir nombre, descripción, precio y categoría
         plato.setNombre(dto.getNombre().trim());
         plato.setDescripcion(dto.getDescripcion().trim());
         plato.setPrecio(dto.getPrecio().setScale(2, RoundingMode.HALF_UP));
         plato.setCategoria(dto.getCategoria());
+
+        // Plato creado por el chef
         plato.setEstaEnCarta(true);
         plato.setEsDelChef(false);
 
@@ -91,15 +103,21 @@ public class PlatoServiceImpl implements PlatoService {
     @Override
     @Transactional
     public Plato anadirPlatoExistenteALaCarta(Long idPlato) {
+
+        // Obtiene el palto
         Plato plato = buscarPorId(idPlato);
 
+        // Control de seguridad evitar añadir a carta un plato del chef o que ya está en carta
         if(plato.getEsDelChef()){
             throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden añadir a la carta.");
         }
         if(plato.getEstaEnCarta()){
             throw new IllegalArgumentException("El plato '" + plato.getNombre() + "' ya está en la carta.");
         }
+
+        // Poner el plato visible en carta
         plato.setEstaEnCarta(true);
+
         return platoRepository.save(plato);
     }
 
@@ -117,13 +135,14 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public Plato buscarPorId(Long id) {
+        //Obtener un plato concreto
         return platoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el plato con id " + id + "."));
     }
 
     @Override
     public List<Plato> listarTodosPlatos() {
-        // Usado por ChefController (US-13) para los desplegables del menú diario
+        // Obtener todos los platos
         return platoRepository.findAll();
     }
 }

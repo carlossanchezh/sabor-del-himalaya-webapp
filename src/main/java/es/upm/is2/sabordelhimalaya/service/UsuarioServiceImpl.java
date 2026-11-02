@@ -3,7 +3,7 @@ package es.upm.is2.sabordelhimalaya.service;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 
-import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.RegistroUsuarioDTO;
 
 import es.upm.is2.sabordelhimalaya.enums.Rol;
 
@@ -31,12 +31,12 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         // comprobar que el correo no está registrado
         if (usuarioRepository.existsByCorreo(dto.getCorreo())) {
-            throw new OperacionNoPermitidaException("El correo ya está registrado.");
+            throw new IllegalArgumentException ("El correo ya está registrado.");
         }
 
         // comprobar que el login no está registrado
         if (usuarioRepository.existsByLogin(dto.getLogin())) {
-            throw new OperacionNoPermitidaException("El nombre de usuario (login) ya está registrado. Prueba con otro.");
+            throw new IllegalArgumentException ("El nombre de usuario (login) ya está registrado. Prueba con otro.");
         }
 
         // Crear el usuario
@@ -114,8 +114,8 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public Usuario buscarPorLogin(String login) {
-        // TODO: return usuarioRepository.findByLogin(login).orElse(null);
-        throw new UnsupportedOperationException("TODO US-03");
+        return usuarioRepository.findByLogin(login)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el usuario " + login));
     }
 
     @Override

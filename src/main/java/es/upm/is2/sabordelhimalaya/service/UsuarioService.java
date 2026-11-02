@@ -2,7 +2,7 @@ package es.upm.is2.sabordelhimalaya.service;
 
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 
-import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.RegistroUsuarioDTO;
 
 import java.util.List;
 

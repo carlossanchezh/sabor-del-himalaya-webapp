@@ -24,4 +24,12 @@ public class GlobalExceptionHandler {
         model.addAttribute("mensajeError", ex.getMessage());
         return "error/403"; // Devuelve la plantilla templates/error/403.html
     }
+
+    // Captura el error 500
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // Error 500
+    public String handleGenericException(Exception ex, Model model) {
+        model.addAttribute("mensajeError", "Ha ocurrido un error inesperado. Por favor, inténtalo más tarde.");
+        return "error/500"; // Devuelve la plantilla templates/error/500.html
+    }
 }

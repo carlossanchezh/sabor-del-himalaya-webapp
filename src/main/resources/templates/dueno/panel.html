@@ -4,33 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Panel Dueño - Carta</title>
+
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
 </head>
 <body class="bg-light">
 
-<!-- Cabecera provisional. Cuando Persona 6 tenga el layout, sustituir por: <div th:replace="~{layout :: header}"></div> -->
-<nav class="navbar navbar-dark bg-dark mb-4">
-    <div class="container">
-        <span class="navbar-brand">Sabor del Himalaya · Panel Dueño</span>
-        <form th:action="@{/auth/logout}" method="post" class="m-0">
-            <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
-        </form>
-    </div>
-</nav>
+<!-- Layout -->
+<div th:replace="~{layout :: header}"></div>
 
-<main class="container">
+<main class="container mt-4">
 
-    <!-- Mensaje tras añadir un plato -->
+    <!-- Mensajes de éxito o error -->
     <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}">Mensaje</div>
     <div th:if="${errorCarta}" class="alert alert-danger" th:text="${errorCarta}">Error</div>
 
-    <!-- P18: Carta del restaurante (US-15) -->
+    <!-- Carta del restaurante -->
     <div class="card shadow-sm">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="h4 mb-0">Carta del restaurante</h2>
+
+                <!-- Botón para abrir el modal de añadir plato -->
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
-                    + Añadir plato
+                    Añadir plato
                 </button>
             </div>
 
@@ -62,7 +60,7 @@
     </div>
 </main>
 
-<!-- P20: Pop-up con los platos retirados y la opción de crear uno nuevo (Issue #22) -->
+<!-- Pop-up con los platos retirados y la opción de crear uno nuevo -->
 <div class="modal fade" id="modalAnadirPlato" tabindex="-1" aria-labelledby="tituloAnadirPlato" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
@@ -98,24 +96,26 @@
     </div>
 </div>
 
-<!-- P20/P21: Pop-up para añadir un plato nuevo a la carta (US-17) -->
+<!-- Pop-up para añadir un plato nuevo a la carta -->
 <div class="modal fade" id="modalNuevoPlato" tabindex="-1" aria-labelledby="tituloNuevoPlato" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <form th:action="@{/dueno/platos/nuevo}" th:object="${nuevoPlato}" method="post">
                 <div class="modal-header">
-                    <h3 class="modal-title h5" id="tituloNuevoPlato">Añadir plato a la carta</h3>
+                    <h3 class="modal-title h5" id="tituloNuevoPlato">Crear nuevo plato</h3>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
 
                 <div class="modal-body">
-                    <!-- Errores que devuelve PlatoService.anadirPlatoALaCarta() -->
+                    <!-- Errores de lógica de negocio que devuelve el servicio -->
                     <div th:if="${error}" class="alert alert-danger" th:text="${error}">Error</div>
 
                     <div class="mb-3">
                         <label for="nombre" class="form-label">Nombre</label>
                         <input type="text" id="nombre" class="form-control" th:field="*{nombre}"
                                th:classappend="${#fields.hasErrors('nombre')} ? 'is-invalid'" maxlength="120" required>
+
+                        <!-- Errores de validación -->
                         <span class="invalid-feedback" th:if="${#fields.hasErrors('nombre')}" th:errors="*{nombre}"></span>
                     </div>
 
@@ -154,10 +154,13 @@
     </div>
 </div>
 
+<!-- Bootstrap JS Bundle (necesario para componentes interactivos como modales o pestañas) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <!-- Si el formulario tenía errores, se vuelve a abrir el pop-up al cargar la página -->
 <script th:if="${mostrarModal}">
     new bootstrap.Modal(document.getElementById('modalNuevoPlato')).show();
 </script>
+
 </body>
 </html>

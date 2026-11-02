@@ -1,11 +1,13 @@
-package es.upm.is2.sabordelhimalaya.dto;
+package es.upm.is2.sabordelhimalaya.dto.request;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class LineaPedidoMenuDiarioDTO {
+public class LineaPedidoMenuDiarioDTO implements Serializable {
 
     @NotNull
     private Long idMenuDiario;

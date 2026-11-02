@@ -1,6 +1,6 @@
 package es.upm.is2.sabordelhimalaya.controller;
 
-import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.RegistroUsuarioDTO;
 
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
@@ -9,6 +9,8 @@ import es.upm.is2.sabordelhimalaya.service.UsuarioService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -52,7 +54,7 @@ public class AuthController {
             // Redirección a la pantalla de registro exitoso
             return "redirect:/auth/registro-exitoso";
 
-        } catch (OperacionNoPermitidaException e) {
+        } catch (IllegalArgumentException e) {
 
             // Manejo de posibles errores (correo, login ya utilizados)
             if (e.getMessage().toLowerCase().contains("correo")) {
@@ -71,6 +73,11 @@ public class AuthController {
 
             return "auth/login";
 
+        } catch (DataIntegrityViolationException e) {
+
+            // Manejo de error de concurrencia dos usuarios se registran a la vez con el mismo correo
+            result.reject("error.global", "Ya existe un usuario con esos datos.");
+            return "auth/login";
         }
     }
 
@@ -112,10 +119,15 @@ public class AuthController {
             // Si el usuario o el correo no existen en la BD, mostramos error
             redirectAttributes.addFlashAttribute("mensajeError", e.getMessage());
 
+        } catch (MailException e) {
+
+            // Si hay un fallo en el envio del mail
+            redirectAttributes.addFlashAttribute("mensajeError", "No se ha podido enviar el correo. Inténtalo más tarde.");
+
         } catch (Exception e) {
 
             // Si hay un fallo externo o desconocido
-            redirectAttributes.addFlashAttribute("mensajeError", "No se ha podido enviar el correo. Inténtalo más tarde.");
+            redirectAttributes.addFlashAttribute("mensajeError", "Ha ocurrido un error inesperado");
         }
 
         // Obtenemos la URL desde la que se hizo la petición

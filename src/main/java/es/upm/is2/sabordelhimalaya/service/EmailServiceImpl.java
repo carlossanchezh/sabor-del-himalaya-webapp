@@ -3,6 +3,7 @@ package es.upm.is2.sabordelhimalaya.service;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -14,12 +15,15 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     @Override
     @Async
     public void enviarCorreoActivacion(Usuario usuario, String token) {
 
-        // Enlace apuntando a Auth controller
-        String enlace = "http://localhost:8080/auth/activar?token=" + token;
+        // Enlace apuntando a Auth controller, usando la URL base configurable en application.propierties
+        String enlace = baseUrl + "/auth/activar?token=" + token;
 
         // Mensaje del email
         SimpleMailMessage mensaje = new SimpleMailMessage();

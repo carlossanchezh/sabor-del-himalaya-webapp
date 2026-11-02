@@ -4,8 +4,8 @@ import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 
 import es.upm.is2.sabordelhimalaya.model.Plato;
 
-import es.upm.is2.sabordelhimalaya.dto.PlatoCreacionDTO;
-import es.upm.is2.sabordelhimalaya.dto.PlatoModificacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoModificacionDTO;
 
 import java.util.List;
 

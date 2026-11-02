@@ -1,4 +1,4 @@
-package es.upm.is2.sabordelhimalaya.dto;
+package es.upm.is2.sabordelhimalaya.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

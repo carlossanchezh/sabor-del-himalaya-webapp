@@ -3,9 +3,9 @@ package es.upm.is2.sabordelhimalaya.service;
 import es.upm.is2.sabordelhimalaya.enums.EstadoPedido;
 import es.upm.is2.sabordelhimalaya.model.Pedido;
 
-import es.upm.is2.sabordelhimalaya.dto.LineaPedidoMenuDiarioDTO;
-import es.upm.is2.sabordelhimalaya.dto.LineaPedidoPlatoDTO;
-import es.upm.is2.sabordelhimalaya.dto.ResumenCarritoDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoMenuDiarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoPlatoDTO;
+import es.upm.is2.sabordelhimalaya.dto.response.ResumenPedidoDTO;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,7 +17,10 @@ public interface PedidoService {
     Pedido crearPedido(Long idUsuario, String direccionEntrega, List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu);
 
     // US-06 / US-07: Calcular productos, subtotales e importe del carrito antes de confirmar
-    ResumenCarritoDTO resumirCarrito(List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu);
+    ResumenPedidoDTO resumirPedidoTemporal(List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu);
+
+    // US-08: Usuario ver el resumen de un pedido ya confirmado
+    ResumenPedidoDTO obtenerResumenDePedido(Long idPedido);
 
     // US-08: Usuario ver el estado de sus pedidos
     List<Pedido> listarPedidosDeUsuario(Long idUsuario);

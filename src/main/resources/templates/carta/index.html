@@ -4,200 +4,198 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nuestra Carta - Sabor del Himalaya</title>
+
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Icono menú no disponible -->
+    <style>
+        .icono-no-disponible {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 5px solid #dc3545;
+            color: #dc3545;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px auto;
+        }
+    </style>
+
 </head>
 <body class="bg-light">
 
-<!-- Cabecera provisional. Cuando Persona 6 tenga el layout, sustituir por: <div th:replace="~{layout :: header}"></div> -->
-<nav class="navbar navbar-dark bg-dark mb-4">
-    <div class="container">
-        <span class="navbar-brand">Sabor del Himalaya · Nuestra Carta</span>
-        <div class="d-flex gap-3 align-items-center">
-            <a class="link-light" th:href="@{/pedidos/mis-pedidos}">Mis pedidos</a>
-            <form th:action="@{/auth/logout}" method="post" class="m-0">
-                <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
-            </form>
-        </div>
-    </div>
-</nav>
+<!-- Layout -->
+<div th:replace="~{layout :: header}"></div>
 
-<main class="container">
+<main class="container mt-4">
 
-    <!-- US-06: avisos al añadir productos al pedido -->
+    <!-- Avisos al añadir productos al pedido -->
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
     <div class="alert alert-success" th:if="${mensaje}" th:text="${mensaje}"></div>
 
     <div class="row g-4">
-    <div class="col-lg-8">
-    <div class="card shadow-sm">
-        <div class="card-body">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
 
-            <h1 class="h3 mb-1">Nuestra Carta</h1>
-            <p class="text-muted">Consulta la carta por categorías o el menú del día.</p>
+                    <!-- Título y botón para ir al historial de pedidos -->
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <h1 class="h3 mb-0">Nuestra Carta</h1>
+                        <a th:href="@{/pedidos/mis-pedidos}" class="btn btn-primary">Mis pedidos</a>
+                    </div>
+                    <p class="text-muted">Consulta la carta por categorías o el menú del día.</p>
 
-            <!-- CA4.1 y P6: pestañas para separar las categorías y el menú del día -->
-            <ul class="nav nav-pills mb-3" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" type="button" role="tab"
-                            data-bs-toggle="pill" data-bs-target="#cat-0">Entrantes</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" type="button" role="tab"
-                            data-bs-toggle="pill" data-bs-target="#cat-1">Principales</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" type="button" role="tab"
-                            data-bs-toggle="pill" data-bs-target="#cat-2">Postres</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" type="button" role="tab"
-                            data-bs-toggle="pill" data-bs-target="#cat-3">Bebidas</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" type="button" role="tab"
-                            data-bs-toggle="pill" data-bs-target="#menu-del-dia">Menú del Día</button>
-                </li>
-            </ul>
-
-            <div class="tab-content">
-
-                <!-- CA4.1, CA4.2, CA4.3: carta por categorías (nombre, descripción y precio) -->
-                <div class="tab-pane fade" role="tabpanel"
-                     th:each="seccion, st : ${carta}" th:id="'cat-' + ${st.index}"
-                     th:classappend="${st.first} ? 'show active'">
-
-                    <p th:if="${#lists.isEmpty(seccion.value)}" class="text-muted">
-                        No hay platos en esta categoría.
-                    </p>
-
-                    <ul class="list-group" th:unless="${#lists.isEmpty(seccion.value)}">
-                        <li class="list-group-item d-flex justify-content-between align-items-start"
-                            th:each="plato : ${seccion.value}">
-                            <div>
-                                <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
-                                <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
-                            </div>
-                            <div class="d-flex align-items-center gap-3 flex-shrink-0">
-                                <span class="fw-semibold"
-                                      th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
-                                <!-- US-06 (CA6.3, CA6.4): añadir el plato o la bebida al pedido -->
-                                <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato})}"></form>
-                            </div>
+                    <!-- Pestañas para separar las categorías y el menú del día -->
+                    <ul class="nav nav-pills mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" type="button" role="tab"
+                                    data-bs-toggle="pill" data-bs-target="#cat-0">Entrantes</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" type="button" role="tab"
+                                    data-bs-toggle="pill" data-bs-target="#cat-1">Principales</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" type="button" role="tab"
+                                    data-bs-toggle="pill" data-bs-target="#cat-2">Postres</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" type="button" role="tab"
+                                    data-bs-toggle="pill" data-bs-target="#cat-3">Bebidas</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" type="button" role="tab"
+                                    data-bs-toggle="pill" data-bs-target="#menu-del-dia">Menú del Día</button>
                         </li>
                     </ul>
-                </div>
 
-                <!-- P6 (CA5.1 - CA5.5): menú diario del día consultado -->
-                <div class="tab-pane fade" id="menu-del-dia" role="tabpanel">
+                    <div class="tab-content">
 
-                    <!-- Selector del día que se quiere consultar (CA5.1) -->
-                    <form class="row g-2 align-items-end mb-4" method="get" th:action="@{/carta}">
-                        <div class="col-auto">
-                            <label class="form-label" for="fecha">Consultar menú del día</label>
-                            <input type="date" class="form-control" id="fecha" name="fecha"
-                                   th:value="${fechaMenu}">
+                        <!-- Carta por categorías (nombre, descripción y precio) -->
+                        <div class="tab-pane fade" role="tabpanel"
+                             th:each="seccion, st : ${carta}" th:id="'cat-' + ${st.index}"
+                             th:classappend="${st.first} ? 'show active'">
+
+                            <p th:if="${#lists.isEmpty(seccion.value)}" class="text-muted">
+                                No hay platos disponibles de esta categoría.
+                            </p>
+
+                            <ul class="list-group" th:unless="${#lists.isEmpty(seccion.value)}">
+                                <li class="list-group-item d-flex justify-content-between align-items-start"
+                                    th:each="plato : ${seccion.value}">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
+                                        <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3 flex-shrink-0">
+                                        <span class="fw-semibold"
+                                              th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+
+                                        <!-- Añadir producto al pedido -->
+                                        <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato})}"></form>
+
+                                    </div>
+                                </li>
+                            </ul>
                         </div>
-                        <div class="col-auto">
-                            <button type="submit" class="btn btn-primary">Consultar</button>
-                        </div>
-                    </form>
 
-                    <!-- CA5.5 / P7: aviso cuando el menú no está configurado -->
-                    <div th:unless="${menuDisponible}" class="text-center py-4">
-                        <div class="display-6">🍽️</div>
-                        <h2 class="h5 mt-3">Menú del día no disponible</h2>
-                        <p class="text-muted">
-                            El menú diario para <strong th:text="${fechaTexto}">fecha</strong> no está configurado.
-                        </p>
-                        <button type="button" class="btn btn-primary"
-                                data-bs-toggle="pill" data-bs-target="#cat-0">Volver a la carta</button>
+                        <!-- Menú del día -->
+                        <div class="tab-pane fade" id="menu-del-dia" role="tabpanel">
+
+                            <!-- Aviso cuando el menú del día no está configurado -->
+                            <div th:unless="${menuDisponible}" class="text-center py-4">
+                                <div class="icono-no-disponible">✗</div>
+                                <h2 class="h5 mt-3">Menú del día no disponible</h2>
+                                <p class="text-muted">
+                                    El menú del día <strong th:text="${fechaTexto}">hoy</strong> no está disponible, no ha sido configurado por el chef todavía.
+                                </p>
+                            </div>
+
+                            <!-- Menú del día configurado -->
+                            <form th:if="${menuDisponible}" th:action="@{/pedidos/anadir-menu}" method="post">
+                                <input type="hidden" name="idMenuDiario" th:value="${menu.idMenuDiario}">
+                                <input type="hidden" name="cantidad" value="1">
+
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h2 class="h5 mb-0">Menú del Día</h2>
+                                        <small class="text-muted" th:text="${fechaTexto}">hoy</small>
+                                    </div>
+
+                                    <!-- El precio del menú diario se muestra como 15 € -->
+                                    <span class="fs-4 fw-bold text-success"
+                                          th:text="${#numbers.formatDecimal(menu.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+                                </div>
+
+                                <p class="text-muted">Elige un entrante, un plato principal, una bebida y un postre.</p>
+
+                                <div class="row g-3">
+
+                                    <!-- Tres entrantes entre los que elegir -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-body-tertiary rounded h-100">
+                                            <h3 class="h6">Entrantes</h3>
+                                            <label class="form-check" th:each="plato : ${entrantesMenu}">
+                                                <input class="form-check-input" type="radio" name="idEntrante" required
+                                                       th:value="${plato.idPlato}">
+                                                <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tres platos principales entre los que elegir -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-body-tertiary rounded h-100">
+                                            <h3 class="h6">Platos principales</h3>
+                                            <label class="form-check" th:each="plato : ${principalesMenu}">
+                                                <input class="form-check-input" type="radio" name="idPrincipal" required
+                                                       th:value="${plato.idPlato}">
+                                                <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bebida (se elige de las bebidas de la carta) -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-body-tertiary rounded h-100">
+                                            <h3 class="h6">Bebida</h3>
+                                            <select class="form-select" name="idBebida" required>
+                                                <option value="">Elige una bebida</option>
+                                                <option th:each="bebida : ${carta['Bebidas']}"
+                                                        th:value="${bebida.idPlato}" th:text="${bebida.nombre}">Bebida</option>
+                                            </select>
+                                            <small class="text-muted">La bebida está incluida en el precio del menú.</small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dos postres entre los que elegir -->
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-body-tertiary rounded h-100">
+                                            <h3 class="h6">Postres</h3>
+                                            <label class="form-check" th:each="plato : ${postresMenu}">
+                                                <input class="form-check-input" type="radio" name="idPostre" required
+                                                       th:value="${plato.idPlato}">
+                                                <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100 mt-3">Añadir menú al pedido</button>
+
+                            </form>
+                        </div>
+
                     </div>
-
-                    <!-- CA5.1 - CA5.4: menú configurado -->
-                    <!-- US-06 (CA6.1, CA6.2): el formulario añade el menú elegido al pedido -->
-                    <form th:if="${menuDisponible}" th:action="@{/pedidos/anadir-menu}" method="post">
-                        <input type="hidden" name="idMenuDiario" th:value="${menu.idMenuDiario}">
-                        <input type="hidden" name="cantidad" value="1">
-
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <h2 class="h5 mb-0">Menú del Día</h2>
-                                <small class="text-muted" th:text="${fechaTexto}">fecha</small>
-                            </div>
-                            <!-- CA5.3: el precio del menú diario se muestra como 15 € -->
-                            <span class="fs-4 fw-bold text-success"
-                                  th:text="${#numbers.formatDecimal(menu.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">15,00 €</span>
-                        </div>
-
-                        <p class="text-muted">Elige un entrante, un plato principal, una bebida y un postre.</p>
-
-                        <div class="row g-3">
-
-                            <!-- CA5.2 y CA5.4: tres entrantes entre los que elegir -->
-                            <div class="col-md-6">
-                                <div class="p-3 bg-body-tertiary rounded h-100">
-                                    <h3 class="h6">Entrantes</h3>
-                                    <label class="form-check" th:each="plato : ${entrantesMenu}">
-                                        <input class="form-check-input" type="radio" name="idEntrante" required
-                                               th:value="${plato.idPlato}">
-                                        <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- CA5.2 y CA5.4: tres platos principales entre los que elegir -->
-                            <div class="col-md-6">
-                                <div class="p-3 bg-body-tertiary rounded h-100">
-                                    <h3 class="h6">Platos principales</h3>
-                                    <label class="form-check" th:each="plato : ${principalesMenu}">
-                                        <input class="form-check-input" type="radio" name="idPrincipal" required
-                                               th:value="${plato.idPlato}">
-                                        <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- CA5.2: bebida (se elige de las bebidas de la carta) -->
-                            <div class="col-md-6">
-                                <div class="p-3 bg-body-tertiary rounded h-100">
-                                    <h3 class="h6">Bebida</h3>
-                                    <select class="form-select" name="idBebida" required>
-                                        <option value="">Elige una bebida</option>
-                                        <option th:each="bebida : ${carta['Bebidas']}"
-                                                th:value="${bebida.idPlato}" th:text="${bebida.nombre}">Bebida</option>
-                                    </select>
-                                    <small class="text-muted">La bebida está incluida en el precio del menú.</small>
-                                </div>
-                            </div>
-
-                            <!-- CA5.2 y CA5.4: dos postres entre los que elegir -->
-                            <div class="col-md-6">
-                                <div class="p-3 bg-body-tertiary rounded h-100">
-                                    <h3 class="h6">Postres</h3>
-                                    <label class="form-check" th:each="plato : ${postresMenu}">
-                                        <input class="form-check-input" type="radio" name="idPostre" required
-                                               th:value="${plato.idPlato}">
-                                        <span class="form-check-label" th:text="${plato.nombre}">Plato</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <!-- Solo se puede pedir el menú de hoy (los de otros días se pueden consultar) -->
-                        <button type="submit" class="btn btn-success w-100 mt-3"
-                                th:if="${fechaMenu.equals(#temporals.createToday())}">Añadir menú al pedido</button>
-                        <p class="text-muted small mt-3 mb-0"
-                           th:unless="${fechaMenu.equals(#temporals.createToday())}">Solo se puede pedir el menú del día de hoy.</p>
-                    </form>
                 </div>
-
             </div>
         </div>
-    </div>
-    </div>
 
-    <!-- US-06 (CA6.5): productos seleccionados e importe acumulado -->
+    <!-- Productos seleccionados e importe acumulado -->
     <aside class="col-lg-4">
         <div th:replace="~{pedidos/fragmentos :: miPedido}"></div>
     </aside>
@@ -205,6 +203,8 @@
 
 </main>
 
+<!-- Bootstrap JS Bundle (necesario para componentes interactivos como modales o pestañas) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

@@ -1,14 +1,12 @@
-package es.upm.is2.sabordelhimalaya;
+package es.upm.is2.sabordelhimalaya.service;
 
-import es.upm.is2.sabordelhimalaya.dto.RegistroUsuarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.RegistroUsuarioDTO;
 import es.upm.is2.sabordelhimalaya.enums.Rol;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 import es.upm.is2.sabordelhimalaya.repository.UsuarioRepository;
 
-import es.upm.is2.sabordelhimalaya.service.EmailService;
-import es.upm.is2.sabordelhimalaya.service.UsuarioServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +28,7 @@ import static org.mockito.Mockito.*;
  Pruebas unitarias de:
  - US-01 (Registro)
  - US-02 (Activación)
+ - US-03 (Inicio de sesión)
  */
 
 @ExtendWith(MockitoExtension.class)
@@ -63,7 +62,6 @@ class UsuarioServiceImplTest {
     @Test
     @DisplayName("CPU-01.1: Registro válido guarda el usuario con datos correctos y cuenta inactiva")
     void registrar_datosValidos_guardaUsuarioCorrectamente() {
-
         when(usuarioRepository.existsByCorreo(anyString())).thenReturn(false);
         when(usuarioRepository.existsByLogin(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("contrasenaCifradaMock");
@@ -92,7 +90,6 @@ class UsuarioServiceImplTest {
     @Test
     @DisplayName("CPU-01.2: Rechaza el registro si el login ya existe")
     void registrar_loginExistente_lanzaExcepcion() {
-
         when(usuarioRepository.existsByLogin(dtoValido.getLogin())).thenReturn(true);
 
         IllegalArgumentException  ex = assertThrows(
@@ -108,7 +105,6 @@ class UsuarioServiceImplTest {
     @Test
     @DisplayName("CPU-01.3: Rechaza el registro si el correo ya existe")
     void registrar_correoExistente_lanzaExcepcion() {
-
         when(usuarioRepository.existsByCorreo(dtoValido.getCorreo())).thenReturn(true);
 
         IllegalArgumentException  ex = assertThrows(
@@ -116,8 +112,30 @@ class UsuarioServiceImplTest {
                 () -> usuarioService.registrar(dtoValido)
         );
 
-        assertTrue(ex.getMessage().toLowerCase().contains("correo"));
+        String msg = ex.getMessage().toLowerCase();
+        assertTrue(msg.contains("correo"));
         verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    @DisplayName("CPU-01.4: Registrar envía el correo con el mismo token que se guarda")
+    void registrar_enviaCorreoConElMismoTokenGuardado() {
+        when(usuarioRepository.existsByCorreo(anyString())).thenReturn(false);
+        when(usuarioRepository.existsByLogin(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hash");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        usuarioService.registrar(dtoValido);
+
+        ArgumentCaptor<Usuario> userCaptor = ArgumentCaptor.forClass(Usuario.class);
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(usuarioRepository).save(userCaptor.capture());
+        verify(emailService).enviarCorreoActivacion(userCaptor.capture(), tokenCaptor.capture());
+
+        Usuario guardado = userCaptor.getValue();
+        assertEquals(guardado.getTokenActivacion(), tokenCaptor.getValue());
+        assertNotNull(guardado.getTokenActivacion());
     }
 
     @Test
@@ -197,18 +215,39 @@ class UsuarioServiceImplTest {
         Usuario inactivo  = new Usuario();
         inactivo .setLogin("usuario1");
         inactivo .setEstadoActivacion(false);
+        inactivo.setTokenActivacion("token-viejo");
 
-        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(inactivo ));
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(inactivo));
 
         usuarioService.reenviarActivacion("usuario1");
 
-        verify(usuarioRepository).save(inactivo );
+        verify(usuarioRepository).save(inactivo);
         assertNotNull(inactivo .getTokenActivacion()); // Debe tener un token nuevo
-        verify(emailService).enviarCorreoActivacion(eq(inactivo ), anyString());
+        assertNotEquals("token-viejo", inactivo.getTokenActivacion());
+        verify(emailService).enviarCorreoActivacion(eq(inactivo), anyString());
     }
 
     @Test
-    @DisplayName("CPU-02.6: Reenviar activación con correo inexistente lanza excepción")
+    @DisplayName("CPU-02.6: Reenviar activación por correo a cuenta inactiva genera nuevo token y envía correo")
+    void reenviarActivacion_porCorreo_enviaCorreo() {
+
+        Usuario inactivo = new Usuario();
+        inactivo.setCorreo("usuario1@test.com");
+        inactivo.setEstadoActivacion(false);
+        inactivo.setTokenActivacion("token-viejo");
+
+        when(usuarioRepository.findByCorreo("usuario1@test.com")).thenReturn(Optional.of(inactivo));
+
+        usuarioService.reenviarActivacion("usuario1@test.com");
+
+        verify(usuarioRepository).save(inactivo);
+        assertNotNull(inactivo .getTokenActivacion()); // Debe tener un token nuevo
+        assertNotEquals("token-viejo", inactivo.getTokenActivacion());
+        verify(emailService).enviarCorreoActivacion(eq(inactivo), anyString());
+    }
+
+    @Test
+    @DisplayName("CPU-02.7: Reenviar activación con correo inexistente lanza excepción")
     void reenviarActivacion_correoInexistente_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findByCorreo("noexiste@test.com"))
@@ -225,7 +264,7 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.7: Reenviar activación con login inexistente lanza excepción")
+    @DisplayName("CPU-02.8: Reenviar activación con login inexistente lanza excepción")
     void reenviarActivacion_loginInexistente_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findByLogin("noexiste"))
@@ -239,5 +278,26 @@ class UsuarioServiceImplTest {
         assertTrue(ex.getMessage().toLowerCase().contains("login"));
         verify(usuarioRepository, never()).save(any(Usuario.class));
         verify(emailService, never()).enviarCorreoActivacion(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("CPU-03.1: buscarPorLogin devuelve el usuario si existe")
+    void buscarPorLogin_existe_devuelveUsuario() {
+
+        Usuario u = new Usuario();
+        u.setLogin("usuario1");
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(u));
+
+        assertSame(u, usuarioService.buscarPorLogin("usuario1"));
+    }
+
+    @Test
+    @DisplayName("CPU-03.2: buscarPorLogin lanza RecursoNoEncontrado si no existe")
+    void buscarPorLogin_noExiste_lanzaRecursoNoEncontrado() {
+
+        when(usuarioRepository.findByLogin("noexiste")).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> usuarioService.buscarPorLogin("noexiste"));
     }
 }

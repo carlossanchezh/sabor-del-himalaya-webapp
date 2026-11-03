@@ -1,7 +1,6 @@
-package es.upm.is2.sabordelhimalaya;
+package es.upm.is2.sabordelhimalaya.service;
 
 import es.upm.is2.sabordelhimalaya.model.Usuario;
-import es.upm.is2.sabordelhimalaya.service.EmailServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

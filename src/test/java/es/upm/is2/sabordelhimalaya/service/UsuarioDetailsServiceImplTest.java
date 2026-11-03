@@ -1,9 +1,8 @@
-package es.upm.is2.sabordelhimalaya;
+package es.upm.is2.sabordelhimalaya.service;
 
 import es.upm.is2.sabordelhimalaya.enums.Rol;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 import es.upm.is2.sabordelhimalaya.repository.UsuarioRepository;
-import es.upm.is2.sabordelhimalaya.service.UsuarioDetailsServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +38,7 @@ class UsuarioDetailsServiceImplTest {
 
     @BeforeEach
     void setUp() {
+
         usuarioActivo = new Usuario();
         usuarioActivo.setIdUsuario(1L);
         usuarioActivo.setLogin("usuario1");
@@ -48,7 +48,7 @@ class UsuarioDetailsServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-03.1: Usuario activo devuelve un UserDetails con username y password correctos")
+    @DisplayName("CPU-03.3: Usuario activo devuelve un UserDetails con username y password correctos")
     void loadUserByUsername_usuarioActivo_devuelveUserDetailsCorrecto() {
 
         when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
@@ -65,8 +65,8 @@ class UsuarioDetailsServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-03.2: La autoridad devuelta lleva el prefijo ROLE_")
-    void loadUserByUsername_autoridadConPrefijoRole() {
+    @DisplayName("CPU-03.4: El rol CLIENTE se mapea a ROLE_CLIENTE")
+    void loadUserByUsername_rolCliente_seMapeaConPrefijo() {
 
         when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
 
@@ -79,7 +79,50 @@ class UsuarioDetailsServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-03.3: Usuario con cuenta no activada se construye con isEnabled()=false")
+    @DisplayName("CPU-03.5: El rol CHEF se mapea a ROLE_CHEF")
+    void loadUserByUsername_rolChef_seMapeaConPrefijo() {
+
+        usuarioActivo.setRol(Rol.CHEF);
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
+
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
+
+        assertEquals(1, userDetails.getAuthorities().size());
+
+        GrantedAuthority authority = userDetails.getAuthorities().iterator().next();
+        assertEquals("ROLE_CHEF", authority.getAuthority());
+    }
+
+    @Test
+    @DisplayName("CPU-03.6: El rol DUENO se mapea a ROLE_DUENO")
+    void loadUserByUsername_rolDueno_seMapeaConPrefijo() {
+
+        usuarioActivo.setRol(Rol.DUENO);
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
+
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
+
+        assertEquals(1, userDetails.getAuthorities().size());
+        GrantedAuthority authority = userDetails.getAuthorities().iterator().next();
+        assertEquals("ROLE_DUENO", authority.getAuthority());
+    }
+
+    @Test
+    @DisplayName("CPU-03.7: El rol STAFF se mapea a ROLE_STAFF")
+    void loadUserByUsername_rolStaff_seMapeaConPrefijo() {
+
+        usuarioActivo.setRol(Rol.STAFF);
+        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
+
+        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
+
+        assertEquals(1, userDetails.getAuthorities().size());
+        GrantedAuthority authority = userDetails.getAuthorities().iterator().next();
+        assertEquals("ROLE_STAFF", authority.getAuthority());
+    }
+
+    @Test
+    @DisplayName("CPU-03.8: Usuario con cuenta no activada se construye con isEnabled()=false")
     void loadUserByUsername_usuarioInactivo_seConstruyeDeshabilitado() {
 
         usuarioActivo.setEstadoActivacion(false);
@@ -91,26 +134,14 @@ class UsuarioDetailsServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-03.4: La contraseña cifrada se pasa al UserDetails sin modificar")
-    void loadUserByUsername_contrasenaCifradaSeMantieneIgual() {
+    @DisplayName("CPU-03.9: Login inexistente lanza UsernameNotFoundException")
+    void loadUserByUsername_usuarioInexistente_lanzaUsernameNotFoundException() {
 
-        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("noexiste")).thenReturn(Optional.empty());
 
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
+        UsernameNotFoundException ex = assertThrows(UsernameNotFoundException.class,
+                () -> usuarioDetailsService.loadUserByUsername("noexiste"));
 
-        assertEquals("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", userDetails.getPassword());
-    }
-
-    @Test
-    @DisplayName("CPU-03.5: El username del UserDetails es el login, no el nombre")
-    void loadUserByUsername_usernameEsElLoginNoElNombre() {
-
-        when(usuarioRepository.findByLogin("usuario1"))
-                .thenReturn(Optional.of(usuarioActivo));
-
-        UserDetails userDetails = usuarioDetailsService.loadUserByUsername("usuario1");
-
-        assertEquals("usuario1", userDetails.getUsername());
-        assertNotEquals("Usuario 1", userDetails.getUsername());
+        assertTrue(ex.getMessage().contains("noexiste"));
     }
 }

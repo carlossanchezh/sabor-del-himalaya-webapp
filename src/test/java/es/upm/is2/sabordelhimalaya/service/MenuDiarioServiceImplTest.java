@@ -1,6 +1,6 @@
-package es.upm.is2.sabordelhimalaya;
+package es.upm.is2.sabordelhimalaya.service;
 
-import es.upm.is2.sabordelhimalaya.dto.MenuDiarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.MenuDiarioDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaMenu;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
@@ -10,7 +10,6 @@ import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.repository.MenuDiarioOpcionRepository;
 import es.upm.is2.sabordelhimalaya.repository.MenuDiarioRepository;
 import es.upm.is2.sabordelhimalaya.repository.PlatoRepository;
-import es.upm.is2.sabordelhimalaya.service.MenuDiarioServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,6 +68,7 @@ class MenuDiarioServiceImplTest {
     }
 
     private MenuDiarioDTO dto(LocalDate fecha, List<Long> entrantes, List<Long> principales, List<Long> postres) {
+
         MenuDiarioDTO dto = new MenuDiarioDTO();
         dto.setFecha(fecha);
         dto.setIdsEntrantes(entrantes);
@@ -82,6 +82,7 @@ class MenuDiarioServiceImplTest {
     }
 
     private void prepararPlatosValidos() {
+
         IDS_ENTRANTES.forEach(id -> when(platoRepository.findById(id))
                 .thenReturn(Optional.of(plato(id, CategoriaPlato.ENTRANTE))));
         IDS_PRINCIPALES.forEach(id -> when(platoRepository.findById(id))
@@ -105,7 +106,7 @@ class MenuDiarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-05.2 (CA5.5): consultarMenuDeFecha devuelve vacío si no hay menú")
+    @DisplayName("CPU-05.2: consultarMenuDeFecha devuelve vacío si no hay menú")
     void consultarMenuDeFecha_noExiste_devuelveVacio() {
 
         when(menuDiarioRepository.findByFecha(hoy)).thenReturn(Optional.empty());
@@ -143,6 +144,7 @@ class MenuDiarioServiceImplTest {
     @Test
     @DisplayName("CPU-13.1: Menú válido (3+3+2) se guarda con precio 15 € y 8 opciones")
     void configurarMenu_valido_guardaMenuYOpciones() {
+
         prepararPlatosValidos();
         when(menuDiarioRepository.save(any(MenuDiario.class))).thenAnswer(inv -> {
             MenuDiario m = inv.getArgument(0);
@@ -168,34 +170,136 @@ class MenuDiarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-13.2: Rechaza el menú si no hay exactamente 3 entrantes")
-    void configurarMenu_dosEntrantes_lanzaError() {
-        MenuDiarioDTO dto = dto(hoy, Arrays.asList(1L, 2L), Arrays.asList(4L, 5L, 6L), Arrays.asList(7L, 8L));
+    @DisplayName("CPU-13.2: Rechaza un menú nulo")
+    void configurarMenu_dtoNulo_lanzaError() {
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(null));
+        assertTrue(ex.getMessage().toLowerCase().contains("fecha"));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.3: Rechaza un menú sin fecha")
+    void configurarMenu_fechaNula_lanzaError() {
+
+        MenuDiarioDTO dto = new MenuDiarioDTO();
+        dto.setIdsEntrantes(IDS_ENTRANTES);
+        dto.setIdsPrincipales(IDS_PRINCIPALES);
+        dto.setIdsPostres(IDS_POSTRES);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
+        assertTrue(ex.getMessage().toLowerCase().contains("fecha"));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.4: Rechaza el menú si no hay exactamente 3 entrantes")
+    void configurarMenu_dosEntrantes_lanzaError() {
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L), IDS_PRINCIPALES, IDS_POSTRES);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
         assertTrue(ex.getMessage().contains("3 entrantes"));
         verify(menuDiarioRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-13.3: Rechaza el menú si falta algún postre sin seleccionar")
-    void configurarMenu_postreSinSeleccionar_lanzaError() {
+    @DisplayName("CPU-13.5: Rechaza el menú si no hay exactamente 3 principales")
+    void configurarMenu_dosPrincipales_lanzaError() {
+
         when(platoRepository.findById(anyLong())).thenAnswer(inv -> {
             long id = inv.getArgument(0);
-            return Optional.of(plato(id, id <= 3 ? CategoriaPlato.ENTRANTE : CategoriaPlato.PRINCIPAL));
+            return Optional.of(plato(id, CategoriaPlato.ENTRANTE));
         });
-        List<Long> postres = new ArrayList<>(Arrays.asList(7L, null)); // desplegable vacío
-        MenuDiarioDTO dto = dto(hoy, Arrays.asList(1L, 2L, 3L), Arrays.asList(4L, 5L, 6L), postres);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        MenuDiarioDTO dto = dto(hoy, IDS_ENTRANTES, List.of(4L, 5L), IDS_POSTRES);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
+        assertTrue(ex.getMessage().contains("3 platos principales"));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.6: Rechaza el menú si no hay exactamente 2 postres")
+    void configurarMenu_unPostre_lanzaError() {
+
+        when(platoRepository.findById(anyLong())).thenAnswer(inv -> {
+            long id = inv.getArgument(0);
+            CategoriaPlato categoria = (id <= 3)
+                    ? CategoriaPlato.ENTRANTE
+                    : CategoriaPlato.PRINCIPAL;
+            return Optional.of(plato(id, categoria));
+        });
+
+        MenuDiarioDTO dto = dto(hoy, IDS_ENTRANTES, IDS_PRINCIPALES, List.of(7L));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
         assertTrue(ex.getMessage().contains("2 postres"));
         verify(menuDiarioRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-13.4: Rechaza el menú si se repite un plato en la misma categoría")
+    @DisplayName("CPU-13.7: Rechaza el menú si falta algún entrante sin seleccionar")
+    void configurarMenu_entranteSinSeleccionar_lanzaError() {
+
+        List<Long> entrantes = new ArrayList<>(Arrays.asList(1L, 2L, null));
+        MenuDiarioDTO dto = dto(hoy, entrantes, IDS_PRINCIPALES, IDS_POSTRES);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
+        assertTrue(ex.getMessage().contains("3 entrantes"));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.8: Rechaza el menú si falta algún principal sin seleccionar")
+    void configurarMenu_principalSinSeleccionar_lanzaError() {
+
+        when(platoRepository.findById(anyLong())).thenAnswer(inv -> {
+            long id = inv.getArgument(0);
+            return Optional.of(plato(id, CategoriaPlato.ENTRANTE));
+        });
+
+        List<Long> principales = new ArrayList<>(Arrays.asList(4L, 5L, null));
+        MenuDiarioDTO dto = dto(hoy, IDS_ENTRANTES, principales, IDS_POSTRES);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
+        assertTrue(ex.getMessage().contains("platos principales"));   // ← "platos" incluido
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.9: Rechaza el menú si falta algún postre sin seleccionar")
+    void configurarMenu_postreSinSeleccionar_lanzaError() {
+
+        when(platoRepository.findById(anyLong())).thenAnswer(inv -> {
+            long id = inv.getArgument(0);
+            CategoriaPlato categoria = (id <= 3)
+                    ? CategoriaPlato.ENTRANTE
+                    : CategoriaPlato.PRINCIPAL;
+            return Optional.of(plato(id, categoria));
+        });
+
+        List<Long> postres = new ArrayList<>(Arrays.asList(7L, null));
+        MenuDiarioDTO dto = dto(hoy, IDS_ENTRANTES, IDS_PRINCIPALES, postres);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> menuDiarioService.configurarMenu(dto));
+        assertTrue(ex.getMessage().contains("2 postres"));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.10: Rechaza el menú si se repite un plato en la misma categoría")
     void configurarMenu_platoRepetido_lanzaError() {
-        MenuDiarioDTO dto = dto(hoy, Arrays.asList(1L, 1L, 3L), Arrays.asList(4L, 5L, 6L), Arrays.asList(7L, 8L));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 1L, 3L), List.of(4L, 5L, 6L), List.of(7L, 8L));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
         assertTrue(ex.getMessage().contains("repetir"));
@@ -203,20 +307,104 @@ class MenuDiarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-13.5: Rechaza un postre seleccionado como entrante (categoría incorrecta)")
-    void configurarMenu_categoriaIncorrecta_lanzaError() {
+    @DisplayName("CPU-13.11: Rechaza un entrante seleccionado como principal")
+    void configurarMenu_entranteComoPrincipal_lanzaError() {
+
         when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
         when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
-        when(platoRepository.findById(7L)).thenReturn(Optional.of(plato(7L, CategoriaPlato.POSTRE)));
-        MenuDiarioDTO dto = dto(hoy, Arrays.asList(1L, 2L, 7L), Arrays.asList(4L, 5L, 6L), Arrays.asList(7L, 8L));
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(plato(3L, CategoriaPlato.ENTRANTE)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 3L), List.of(1L, 5L, 6L), List.of(7L, 8L));
 
         assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
         verify(menuDiarioRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-13.6: Rechaza configurar un día que ya tiene menú")
+    @DisplayName("CPU-13.12: Rechaza un entrante seleccionado como postre")
+    void configurarMenu_entranteComoPostre_lanzaError() {
+
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(plato(3L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(4L)).thenReturn(Optional.of(plato(4L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(5L)).thenReturn(Optional.of(plato(5L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(6L)).thenReturn(Optional.of(plato(6L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(7L)).thenReturn(Optional.of(plato(7L, CategoriaPlato.POSTRE)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), List.of(7L, 1L));
+
+        assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.13: Rechaza un principal seleccionado como entrante")
+    void configurarMenu_principalComoEntrante_lanzaError() {
+
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(4L)).thenReturn(Optional.of(plato(4L, CategoriaPlato.PRINCIPAL)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 4L), List.of(4L, 5L, 6L), List.of(7L, 8L));
+
+        assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.14: Rechaza un principal seleccionado como postre")
+    void configurarMenu_principalComoPostre_lanzaError() {
+
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(plato(3L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(4L)).thenReturn(Optional.of(plato(4L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(5L)).thenReturn(Optional.of(plato(5L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(6L)).thenReturn(Optional.of(plato(6L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(7L)).thenReturn(Optional.of(plato(7L, CategoriaPlato.POSTRE)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 3L), List.of(4L, 5L, 6L), List.of(7L, 4L));
+
+        assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.15: Rechaza un postre seleccionado como entrante")
+    void configurarMenu_postreComoEntrante_lanzaError() {
+
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(7L)).thenReturn(Optional.of(plato(7L, CategoriaPlato.POSTRE)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 7L), List.of(4L, 5L, 6L), List.of(7L, 8L));
+
+        assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.16: Rechaza un postre seleccionado como principal")
+    void configurarMenu_postreComoPrincipal_lanzaError() {
+
+        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(plato(3L, CategoriaPlato.ENTRANTE)));
+        when(platoRepository.findById(4L)).thenReturn(Optional.of(plato(4L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(5L)).thenReturn(Optional.of(plato(5L, CategoriaPlato.PRINCIPAL)));
+        when(platoRepository.findById(7L)).thenReturn(Optional.of(plato(7L, CategoriaPlato.POSTRE)));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 3L), List.of(4L, 5L, 7L), List.of(7L, 8L));
+
+        assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dto));
+        verify(menuDiarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-13.17: Rechaza configurar un día que ya tiene menú")
     void configurarMenu_fechaYaConfigurada_lanzaError() {
+
         when(menuDiarioRepository.existsByFecha(hoy)).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> menuDiarioService.configurarMenu(dtoValido()));
@@ -225,8 +413,9 @@ class MenuDiarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-13.7: Rechaza configurar el menú de un día pasado")
+    @DisplayName("CPU-13.18: Rechaza configurar el menú de un día pasado")
     void configurarMenu_fechaPasada_lanzaError() {
+
         MenuDiarioDTO dto = dtoValido();
         dto.setFecha(LocalDate.now().minusDays(1));
 
@@ -235,12 +424,14 @@ class MenuDiarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-13.8: Lanza RecursoNoEncontrado si un plato no existe")
+    @DisplayName("CPU-13.19: Lanza RecursoNoEncontrado si un plato no existe")
     void configurarMenu_platoInexistente_lanzaRecursoNoEncontrado() {
+
         when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
         when(platoRepository.findById(2L)).thenReturn(Optional.of(plato(2L, CategoriaPlato.ENTRANTE)));
         when(platoRepository.findById(99L)).thenReturn(Optional.empty());
-        MenuDiarioDTO dto = dto(hoy, Arrays.asList(1L, 2L, 99L), Arrays.asList(4L, 5L, 6L), Arrays.asList(7L, 8L));
+
+        MenuDiarioDTO dto = dto(hoy, List.of(1L, 2L, 99L), List.of(4L, 5L, 6L), List.of(7L, 8L));
 
         assertThrows(RecursoNoEncontradoException.class, () -> menuDiarioService.configurarMenu(dto));
         verify(menuDiarioRepository, never()).save(any());

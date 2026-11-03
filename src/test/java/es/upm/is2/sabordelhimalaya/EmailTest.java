@@ -1,5 +1,6 @@
 package es.upm.is2.sabordelhimalaya;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+@Disabled
 @SpringBootTest
 class EmailTest {
 

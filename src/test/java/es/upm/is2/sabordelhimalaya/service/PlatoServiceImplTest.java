@@ -1,12 +1,11 @@
-package es.upm.is2.sabordelhimalaya;
+package es.upm.is2.sabordelhimalaya.service;
 
-import es.upm.is2.sabordelhimalaya.dto.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.repository.PlatoRepository;
-import es.upm.is2.sabordelhimalaya.service.PlatoServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +51,7 @@ class PlatoServiceImplTest {
 
     @BeforeEach
     void setUp() {
+
         platoRetirado = new Plato(1L, "Plato 1", "Descripción 1",
                 new BigDecimal("10.00"), CategoriaPlato.PRINCIPAL, false, false);
         platoDelChef  = new Plato(2L, "Plato 2", "Descripción 2",
@@ -70,6 +70,7 @@ class PlatoServiceImplTest {
     }
 
     private PlatoCreacionDTO dto(String nombre, String descripcion, String precio, CategoriaPlato categoria) {
+
         PlatoCreacionDTO dto = new PlatoCreacionDTO();
         dto.setNombre(nombre);
         dto.setDescripcion(descripcion);
@@ -96,23 +97,23 @@ class PlatoServiceImplTest {
     void listarCartaPorCategoria_filtraPorCategoria() {
 
         List<Plato> entrantes = List.of(platoEnCarta);
-        when(platoRepository.findByEstaEnCartaTrueAndCategoria(CategoriaPlato.ENTRANTE))
+        when(platoRepository.findByEstaEnCartaTrueAndCategoria(CategoriaPlato.PRINCIPAL))
                 .thenReturn(entrantes);
 
-        List<Plato> resultado = platoService.listarCartaPorCategoria(CategoriaPlato.ENTRANTE);
+        List<Plato> resultado = platoService.listarCartaPorCategoria(CategoriaPlato.PRINCIPAL);
 
         assertEquals(entrantes, resultado);
         verify(platoRepository)
-                .findByEstaEnCartaTrueAndCategoria(CategoriaPlato.ENTRANTE);
+                .findByEstaEnCartaTrueAndCategoria(CategoriaPlato.PRINCIPAL);
     }
 
     @Test
     @DisplayName("CPU-04.3: buscarPorId devuelve el plato si existe")
     void buscarPorId_existe_devuelvePlato() {
 
-        when(platoRepository.findById(1L)).thenReturn(Optional.of(platoEnCarta));
+        when(platoRepository.findById(3L)).thenReturn(Optional.of(platoEnCarta));
 
-        Plato resultado = platoService.buscarPorId(1L);
+        Plato resultado = platoService.buscarPorId(3L);
 
         assertSame(platoEnCarta, resultado);
     }
@@ -141,6 +142,7 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.1: Plato válido se guarda en la carta y no es del chef")
     void anadirPlatoALaCarta_valido_guardaPlatoEnCarta() {
+
         when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Plato resultado = platoService.anadirPlatoALaCarta(dtoValido);
@@ -161,6 +163,7 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.2: Quita los espacios del nombre y la descripción y deja el precio con 2 decimales")
     void anadirPlatoALaCarta_limpiaDatosYRedondeaPrecio() {
+
         when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
 
         PlatoCreacionDTO conEspacios = new PlatoCreacionDTO();
@@ -179,7 +182,8 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.3: Rechaza el plato si el precio es 0")
     void anadirPlatoALaCarta_precioCero_lanzaError() {
-        PlatoCreacionDTO dto = dto("Lassi", "Bebida de yogur", "0", CategoriaPlato.BEBIDA);
+
+        PlatoCreacionDTO dto = dto("Plato 7", "Descripción 7", "0", CategoriaPlato.BEBIDA);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
         assertTrue(ex.getMessage().contains("precio"));
@@ -189,15 +193,18 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.4: Rechaza el plato si el precio es negativo")
     void anadirPlatoALaCarta_precioNegativo_lanzaError() {
-        PlatoCreacionDTO dto = dto("Lassi", "Bebida de yogur", "-3.00", CategoriaPlato.BEBIDA);
 
-        assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
+        PlatoCreacionDTO dto = dto("Plato 7", "Descripción 7", "-3.00", CategoriaPlato.BEBIDA);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
+        assertTrue(ex.getMessage().contains("precio"));
         verify(platoRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("CPU-17.5: Rechaza el plato si el nombre está vacío")
     void anadirPlatoALaCarta_nombreVacio_lanzaError() {
+
         PlatoCreacionDTO dto = dto("   ", "Descripción", "5.00", CategoriaPlato.POSTRE);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
@@ -208,7 +215,7 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.6: Rechaza el plato si la descripción está vacía")
     void anadirPlatoALaCarta_descripcionVacia_lanzaError() {
-        PlatoCreacionDTO dto = dto("Kheer", "", "5.00", CategoriaPlato.POSTRE);
+        PlatoCreacionDTO dto = dto("Plato 8", "", "5.00", CategoriaPlato.POSTRE);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
         assertTrue(ex.getMessage().contains("descripcion"));
@@ -218,7 +225,8 @@ class PlatoServiceImplTest {
     @Test
     @DisplayName("CPU-17.7: Rechaza el plato si no tiene categoría")
     void anadirPlatoALaCarta_sinCategoria_lanzaError() {
-        PlatoCreacionDTO dto = dto("Kheer", "Arroz con leche", "5.00", null);
+
+        PlatoCreacionDTO dto = dto("Plato 8", "Descripción 8", "5.00", null);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
         assertTrue(ex.getMessage().contains("categoria"));
@@ -226,15 +234,31 @@ class PlatoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-17.8: Rechaza la petición si no llegan datos")
+    @DisplayName("CPU-17.8: Rechaza el plato si el nombre ya existe")
+    void anadirPlatoALaCarta_nombreDuplicado_lanzaError() {
+
+        when(platoRepository.findAll()).thenReturn(List.of(platoEnCarta));
+
+        PlatoCreacionDTO dto = dto("Plato 3", "Descripción 3", "10.00", CategoriaPlato.ENTRANTE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> platoService.anadirPlatoALaCarta(dto));
+        assertTrue(ex.getMessage().toLowerCase().contains("ya existe"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("CPU-17.9: Rechaza la petición si no llegan datos")
     void anadirPlatoALaCarta_dtoNulo_lanzaError() {
+
         assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(null));
         verify(platoRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-17.9: Un plato retirado vuelve a estar en la carta")
+    @DisplayName("CPU-17.10: Un plato retirado vuelve a estar en la carta")
     void anadirPlatoExistente_retirado_vuelveALaCarta() {
+
         when(platoRepository.findById(1L)).thenReturn(Optional.of(platoRetirado));
         when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -246,8 +270,9 @@ class PlatoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-17.10: Rechaza añadir a la carta un plato del chef")
+    @DisplayName("CPU-17.11: Rechaza añadir a la carta un plato del chef")
     void anadirPlatoExistente_delChef_lanzaOperacionNoPermitida() {
+
         when(platoRepository.findById(2L)).thenReturn(Optional.of(platoDelChef));
 
         assertThrows(OperacionNoPermitidaException.class, () -> platoService.anadirPlatoExistenteALaCarta(2L));
@@ -255,8 +280,9 @@ class PlatoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-17.11: Rechaza añadir un plato que ya está en la carta")
+    @DisplayName("CPU-17.12: Rechaza añadir un plato que ya está en la carta")
     void anadirPlatoExistente_yaEnCarta_lanzaError() {
+
         when(platoRepository.findById(3L)).thenReturn(Optional.of(platoEnCarta));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoExistenteALaCarta(3L));
@@ -265,8 +291,9 @@ class PlatoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-17.12: Lanza RecursoNoEncontrado si el plato no existe")
+    @DisplayName("CPU-17.13: Lanza RecursoNoEncontrado si el plato no existe")
     void anadirPlatoExistente_inexistente_lanzaRecursoNoEncontrado() {
+
         when(platoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RecursoNoEncontradoException.class, () -> platoService.anadirPlatoExistenteALaCarta(99L));
@@ -274,8 +301,9 @@ class PlatoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-17.13: La lista de retirados usa la consulta que excluye los platos del chef")
+    @DisplayName("CPU-17.14: La lista de retirados usa la consulta que excluye los platos del chef")
     void listarPlatosRetirados_devuelveLosDelRepositorio() {
+
         List<Plato> retirados = List.of(platoRetirado);
         when(platoRepository.findByEstaEnCartaFalseAndEsDelChefFalse()).thenReturn(retirados);
 

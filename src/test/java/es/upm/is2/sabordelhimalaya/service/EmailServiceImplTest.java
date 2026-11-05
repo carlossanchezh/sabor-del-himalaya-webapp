@@ -32,11 +32,12 @@ class EmailServiceImplTest {
 
     @BeforeEach
     void setUp() {
+
         ReflectionTestUtils.setField(emailService, "baseUrl", "http://localhost:8080");
     }
 
     @Test
-    @DisplayName("CPU-02.8: Enviar correo construye el mensaje correctamente")
+    @DisplayName("PU-02-01: Enviar correo construye el mensaje correctamente")
     void enviarCorreoActivacion_construyeMensajeCorrectamente() {
 
         Usuario usuario = new Usuario();

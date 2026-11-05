@@ -100,10 +100,42 @@ public class PedidoServiceImplTest {
     }
 
     private Plato plato(long id, CategoriaPlato cat, boolean enCarta) {
+
         return new Plato(id, "Plato " + id, "Descripción " + id, new BigDecimal("10.00"), cat, enCarta, false);
     }
 
-    private void prepararMenuHoyConOpciones() {
+    private Pedido pedido(long id, EstadoPedido estado, String importeTotal) {
+
+        Pedido p = new Pedido();
+        p.setIdPedido(id);
+        p.setEstado(estado);
+        p.setImporteTotal(new BigDecimal(importeTotal));
+        return p;
+    }
+
+    private LineaPedidoPlato lineaPedidoPlato(Plato plato, int cantidad, String precioUnitario) {
+
+        LineaPedidoPlato lp = new LineaPedidoPlato();
+        lp.setPlato(plato);
+        lp.setCantidad(cantidad);
+        lp.setPrecioUnitario(new BigDecimal(precioUnitario));
+        return lp;
+    }
+
+    private LineaPedidoMenuDiario lineaPedidoMenu(int cantidad, String precioUnitario) {
+
+        LineaPedidoMenuDiario lm = new LineaPedidoMenuDiario();
+        lm.setMenuDiario(menuHoy);
+        lm.setEntrante(entrante);
+        lm.setPrincipal(principal);
+        lm.setPostre(postre);
+        lm.setBebida(bebida);
+        lm.setCantidad(cantidad);
+        lm.setPrecioUnitario(new BigDecimal(precioUnitario));
+        return lm;
+    }
+
+    private void prepararMenu() {
 
         when(menuDiarioRepository.findById(1L)).thenReturn(Optional.of(menuHoy));
         when(platoRepository.findById(13L)).thenReturn(Optional.of(bebida));
@@ -125,20 +157,79 @@ public class PedidoServiceImplTest {
         return new MenuDiarioOpcion(null, menu, plato, categoria);
     }
 
+
     @Test
-    @DisplayName("CPU-07.1: crearPedido válido con un plato guarda con total y estado correctos")
+    @DisplayName("PU-07-01: resumirPedidoTemporal con un plato devuelve 1 línea")
+    void resumirPedidoTemporal_conPlato_devuelveResumen_Linea() {
+
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+
+        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
+                List.of(lineaPlatoDTO), List.of());
+
+        assertEquals(1, resumen.getLineas().size());
+
+        ResumenPedidoDTO.Linea linea = resumen.getLineas().getFirst();
+        assertFalse(linea.isMenu());
+        assertEquals("Plato 10", linea.getNombre());
+        assertNull(linea.getDetalle());
+    }
+
+    @Test
+    @DisplayName("PU-07-02: resumirPedidoTemporal con un plato devuelve 1 total correcto")
+    void resumirPedidoTemporal_conPlato_devuelveResumen_Precio() {
+
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+
+        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
+                List.of(lineaPlatoDTO), List.of());
+
+        assertEquals(0, new BigDecimal("10.00").compareTo(resumen.getTotal()));
+    }
+
+    @Test
+    @DisplayName("PU-07-03: resumirPedidoTemporal con un menú devuelve detalle con los 4 platos")
+    void resumirPedidoTemporal_conMenu_devuelveDetalle_Linea() {
+
+        prepararMenu();
+
+        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
+                List.of(), List.of(lineaMenuDTO));
+
+        assertEquals(1, resumen.getLineas().size());
+
+        ResumenPedidoDTO.Linea linea = resumen.getLineas().getFirst();
+        assertTrue(linea.isMenu());
+        assertEquals("Menú del día", linea.getNombre());
+        assertEquals("Plato 10 · Plato 11 · Plato 12 · Plato 13", linea.getDetalle());
+    }
+
+    @Test
+    @DisplayName("PU-07-04: resumirPedidoTemporal con un menú devuelve detalle con el precio total")
+    void resumirPedidoTemporal_conMenu_devuelveDetalle_Precio() {
+
+        prepararMenu();
+
+        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
+                List.of(), List.of(lineaMenuDTO));
+
+        assertEquals(0, new BigDecimal("15.00").compareTo(resumen.getTotal()));
+    }
+
+    @Test
+    @DisplayName("PU-07-05: crearPedido válido con un plato guarda con total y estado correctos")
     void crearPedido_unPlato_guardaCorrectamente() {
 
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
         when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Pedido resultado = pedidoService.crearPedido(1L, "Calle Mayor 5",
+        Pedido resultado = pedidoService.crearPedido(1L, usuario.getDireccion(),
                 List.of(lineaPlatoDTO), List.of());
 
         assertEquals(0, new BigDecimal("10.00").compareTo(resultado.getImporteTotal()));
         assertEquals(EstadoPedido.RECIBIDO, resultado.getEstado());
-        assertEquals("Calle Mayor 5", resultado.getDireccionEntrega());
+        assertEquals("Calle Falsa 123", resultado.getDireccionEntrega());
         assertSame(usuario, resultado.getUsuario());
         assertNotNull(resultado.getFechaHora());
 
@@ -148,14 +239,15 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-07.2: crearPedido válido con un menú del día guarda con total 15 €")
+    @DisplayName("PU-07-06: crearPedido válido con un menú del día guarda con total 15 €")
     void crearPedido_unMenu_guardaConTotalDelMenu() {
 
-        prepararMenuHoyConOpciones();
+        prepararMenu();
+
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Pedido resultado = pedidoService.crearPedido(1L, "Calle Mayor 5",
+        Pedido resultado = pedidoService.crearPedido(1L, usuario.getDireccion(),
                 List.of(), List.of(lineaMenuDTO));
 
         assertEquals(0, new BigDecimal("15.00").compareTo(resultado.getImporteTotal()));
@@ -163,18 +255,18 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-07.3: crearPedido vacío lanza IllegalArgumentException")
+    @DisplayName("PU-07-07: crearPedido vacío lanza IllegalArgumentException")
     void crearPedido_vacio_lanzaError() {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pedidoService.crearPedido(1L, "Calle Mayor 5", List.of(), List.of()));
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(), List.of(), List.of()));
 
         assertTrue(ex.getMessage().contains("vacío"));
         verify(pedidoRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-07.4: crearPedido sin dirección lanza IllegalArgumentException")
+    @DisplayName("PU-07-08: crearPedido sin dirección lanza IllegalArgumentException")
     void crearPedido_sinDireccion_lanzaError() {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -185,20 +277,20 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-07.5: crearPedido con usuario inexistente lanza RecursoNoEncontrado")
+    @DisplayName("PU-07-09: crearPedido con usuario inexistente lanza RecursoNoEncontrado")
     void crearPedido_usuarioInexistente_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RecursoNoEncontradoException.class,
-                () -> pedidoService.crearPedido(99L, "Calle Mayor 5",
+                () -> pedidoService.crearPedido(99L, usuario.getDireccion(),
                         List.of(lineaPlatoDTO), List.of()));
 
         verify(pedidoRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-07.6: crearPedido con un plato retirado de la carta lanza IllegalArgumentException")
+    @DisplayName("PU-07-10: crearPedido con un plato retirado de la carta lanza IllegalArgumentException")
     void crearPedido_platoRetirado_lanzaError() {
 
         lineaPlatoDTO.setIdPlato(platoRetirado.getIdPlato());
@@ -206,7 +298,7 @@ public class PedidoServiceImplTest {
         when(platoRepository.findById(20L)).thenReturn(Optional.of(platoRetirado));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pedidoService.crearPedido(1L, "Calle Mayor 5",
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
                         List.of(lineaPlatoDTO), List.of()));
 
         assertTrue(ex.getMessage().contains("ya no está en la carta"));
@@ -214,21 +306,21 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-07.7: crearPedido con cantidad 0 lanza IllegalArgumentException")
+    @DisplayName("PU-07-11: crearPedido con cantidad 0 lanza IllegalArgumentException")
     void crearPedido_cantidadCero_lanzaError() {
 
         lineaPlatoDTO.setCantidad(0);
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pedidoService.crearPedido(1L, "Calle Mayor 5",
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
                         List.of(lineaPlatoDTO), List.of()));
 
         assertTrue(ex.getMessage().contains("cantidad"));
     }
 
     @Test
-    @DisplayName("CPU-07.8: crearPedido con menú que no es de hoy lanza IllegalArgumentException")
+    @DisplayName("PU-07-12: crearPedido con menú que no es de hoy lanza IllegalArgumentException")
     void crearPedido_menuNoEsDeHoy_lanzaError() {
 
         lineaMenuDTO.setIdMenuDiario(menuAyer.getIdMenuDiario());
@@ -236,80 +328,113 @@ public class PedidoServiceImplTest {
         when(menuDiarioRepository.findById(2L)).thenReturn(Optional.of(menuAyer));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pedidoService.crearPedido(1L, "Calle Mayor 5",
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
                         List.of(), List.of(lineaMenuDTO)));
 
         assertTrue(ex.getMessage().contains("hoy"));
     }
 
     @Test
-    @DisplayName("CPU-07.9: resumirPedidoTemporal con un plato devuelve 1 línea y total correcto")
-    void resumirPedidoTemporal_conPlato_devuelveResumen() {
+    @DisplayName("PU-07-13: crearPedido con dirección demasiado larga lanza IllegalArgumentException")
+    void crearPedido_direccionDemasiadoLarga_lanzaError() {
 
+        String direccion = "a".repeat(256);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.crearPedido(1L, direccion,
+                        List.of(lineaPlatoDTO), List.of()));
+
+        assertTrue(ex.getMessage().toLowerCase().contains("255"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-07-14-01: crearPedido con menú cuyo entrante no está en las opciones del menú lanza IllegalArgumentException")
+    void crearPedido_entranteNoEsOpcionDelMenu_lanzaError() {
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(menuDiarioRepository.findById(1L)).thenReturn(Optional.of(menuHoy));
+        when(platoRepository.findById(13L)).thenReturn(Optional.of(bebida));
+        when(menuDiarioOpcionRepository
+                .findByMenuDiarioIdMenuDiarioAndCategoria(1L, CategoriaMenu.ENTRANTE))
+                .thenReturn(List.of(opcion(menuHoy, entrante, CategoriaMenu.ENTRANTE)));
+
+        lineaMenuDTO.setIdEntrante(principal.getIdPlato());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
+                        List.of(), List.of(lineaMenuDTO)));
+
+        assertTrue(ex.getMessage().contains("entrante"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-07-14-02: crearPedido con menú cuyo principal no está en las opciones del menú lanza IllegalArgumentException")
+    void crearPedido_principalNoEsOpcionDelMenu_lanzaError() {
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(menuDiarioRepository.findById(1L)).thenReturn(Optional.of(menuHoy));
+        when(platoRepository.findById(13L)).thenReturn(Optional.of(bebida));
+        when(menuDiarioOpcionRepository
+                .findByMenuDiarioIdMenuDiarioAndCategoria(1L, CategoriaMenu.ENTRANTE))
+                .thenReturn(List.of(opcion(menuHoy, entrante, CategoriaMenu.ENTRANTE)));
+        when(menuDiarioOpcionRepository
+                .findByMenuDiarioIdMenuDiarioAndCategoria(1L, CategoriaMenu.PRINCIPAL))
+                .thenReturn(List.of(opcion(menuHoy, principal, CategoriaMenu.PRINCIPAL)));
+
+        lineaMenuDTO.setIdPrincipal(postre.getIdPlato());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
+                        List.of(), List.of(lineaMenuDTO)));
+
+        assertTrue(ex.getMessage().contains("principal"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-07-14-03: crearPedido con menú cuyo postre no está en las opciones del menú lanza IllegalArgumentException")
+    void crearPedido_postreNoEsOpcionDelMenu_lanzaError() {
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        prepararMenu();
+
+        lineaMenuDTO.setIdPostre(principal.getIdPlato());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
+                        List.of(), List.of(lineaMenuDTO)));
+
+        assertTrue(ex.getMessage().contains("postre"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-07-15: crearPedido con menú cuya bebida no es de categoría BEBIDA lanza IllegalArgumentException")
+    void crearPedido_bebidaNoEsBebida_lanzaError() {
+
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+        when(menuDiarioRepository.findById(1L)).thenReturn(Optional.of(menuHoy));
         when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
 
-        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
-                List.of(lineaPlatoDTO), List.of());
+        lineaMenuDTO.setIdBebida(entrante.getIdPlato());
 
-        assertEquals(1, resumen.getLineas().size());
-        assertEquals(0, new BigDecimal("10.00").compareTo(resumen.getTotal()));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.crearPedido(1L, usuario.getDireccion(),
+                        List.of(), List.of(lineaMenuDTO)));
 
-        ResumenPedidoDTO.Linea linea = resumen.getLineas().get(0);
-        assertFalse(linea.isMenu());
-        assertEquals("Plato 10", linea.getNombre());
-        assertNull(linea.getDetalle());
+        assertTrue(ex.getMessage().toLowerCase().contains("bebida"));
+        verify(pedidoRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("CPU-07.10: resumirPedidoTemporal con un menú devuelve detalle con los 4 platos")
-    void resumirPedidoTemporal_conMenu_devuelveDetalle() {
-
-        prepararMenuHoyConOpciones();
-
-        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(
-                List.of(), List.of(lineaMenuDTO));
-
-        assertEquals(1, resumen.getLineas().size());
-        assertEquals(0, new BigDecimal("15.00").compareTo(resumen.getTotal()));
-
-        ResumenPedidoDTO.Linea linea = resumen.getLineas().get(0);
-        assertTrue(linea.isMenu());
-        assertEquals("Menú del día", linea.getNombre());
-        // El detalle concatena entrante · principal · postre · bebida
-        assertEquals("Plato 10 · Plato 11 · Plato 12 · Plato 13", linea.getDetalle());
-    }
-
-    @Test
-    @DisplayName("CPU-07.11: resumirPedidoTemporal con listas vacías devuelve resumen vacío")
-    void resumirPedidoTemporal_vacio_devuelveVacio() {
-
-        ResumenPedidoDTO resumen = pedidoService.resumirPedidoTemporal(List.of(), List.of());
-
-        assertTrue(resumen.getLineas().isEmpty());
-        assertEquals(0, BigDecimal.ZERO.compareTo(resumen.getTotal()));
-    }
-
-    @Test
-    @DisplayName("CPU-08.1: obtenerResumenDePedido devuelve las líneas guardadas y el importe")
+    @DisplayName("PU-08-01: obtenerResumenDePedido devuelve las líneas guardadas y el importe")
     void obtenerResumenDePedido_devuelveLineas() {
 
-        Pedido pedido = new Pedido();
-        pedido.setIdPedido(5L);
-        pedido.setImporteTotal(new BigDecimal("25.00"));
-
-        LineaPedidoPlato lp = new LineaPedidoPlato();
-        lp.setPlato(entrante);
-        lp.setCantidad(1);
-        lp.setPrecioUnitario(new BigDecimal("10.00"));
-
-        LineaPedidoMenuDiario lm = new LineaPedidoMenuDiario();
-        lm.setMenuDiario(menuHoy);
-        lm.setEntrante(entrante);
-        lm.setPrincipal(principal);
-        lm.setPostre(postre);
-        lm.setBebida(bebida);
-        lm.setCantidad(1);
-        lm.setPrecioUnitario(new BigDecimal("15.00"));
+        Pedido pedido = pedido(5L, EstadoPedido.RECIBIDO, "25.00");
+        LineaPedidoPlato lp = lineaPedidoPlato(entrante, 1, "10.00");
+        LineaPedidoMenuDiario lm = lineaPedidoMenu(1, "15.00");
 
         when(pedidoRepository.findById(5L)).thenReturn(Optional.of(pedido));
         when(lineaPedidoPlatoRepository.findByPedidoIdPedido(5L)).thenReturn(List.of(lp));
@@ -322,7 +447,7 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-08.2: obtenerResumenDePedido con pedido inexistente lanza RecursoNoEncontrado")
+    @DisplayName("PU-08-02: obtenerResumenDePedido con pedido inexistente lanza RecursoNoEncontrado")
     void obtenerResumenDePedido_noExiste_lanzaRecursoNoEncontrado() {
 
         when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
@@ -332,35 +457,50 @@ public class PedidoServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-08.3: listarPedidosDeUsuario devuelve los pedidos del repositorio")
-    void listarPedidosDeUsuario_devuelveLosDelRepositorio() {
+    @DisplayName("PU-08-03: buscarPorId devuelve el pedido con su estado actual")
+    void buscarPorId_devuelvePedidoConEstado() {
 
-        List<Pedido> pedidos = List.of(new Pedido(), new Pedido());
-        when(pedidoRepository.findByUsuarioIdUsuarioOrderByFechaHoraDesc(1L))
-                .thenReturn(pedidos);
+        Pedido pedido = pedido(1L, EstadoPedido.EN_PREPARACION, "10.00");
 
-        assertEquals(pedidos, pedidoService.listarPedidosDeUsuario(1L));
-        verify(pedidoRepository).findByUsuarioIdUsuarioOrderByFechaHoraDesc(1L);
-    }
-
-    @Test
-    @DisplayName("CPU-08.4: buscarPorId devuelve el pedido si existe")
-    void buscarPorId_existe_devuelvePedido() {
-
-        Pedido pedido = new Pedido();
-        pedido.setIdPedido(1L);
         when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
 
-        assertSame(pedido, pedidoService.buscarPorId(1L));
+        Pedido resultado = pedidoService.buscarPorId(1L);
+
+        assertEquals(EstadoPedido.EN_PREPARACION, resultado.getEstado());
     }
 
     @Test
-    @DisplayName("CPU-08.5: buscarPorId lanza RecursoNoEncontrado si no existe")
+    @DisplayName("PU-08-04: buscarPorId lanza RecursoNoEncontrado si no existe")
     void buscarPorId_noExiste_lanzaRecursoNoEncontrado() {
 
         when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RecursoNoEncontradoException.class,
                 () -> pedidoService.buscarPorId(99L));
+    }
+
+    @Test
+    @DisplayName("PU-08-05: listarPedidosDeUsuario devuelve cada pedido con su estado")
+    void listarPedidosDeUsuario_devuelveCadaPedidoConSuEstado() {
+
+        List<Pedido> pedidos = List.of(
+                pedido(1L, EstadoPedido.RECIBIDO,       "10.00"),
+                pedido(2L, EstadoPedido.EN_PREPARACION, "10.00"),
+                pedido(3L, EstadoPedido.EN_REPARTO,     "10.00"),
+                pedido(4L, EstadoPedido.ENTREGADO,      "10.00"),
+                pedido(5L, EstadoPedido.CANCELADO,      "10.00")
+        );
+
+        when(pedidoRepository.findByUsuarioIdUsuarioOrderByFechaHoraDesc(1L))
+                .thenReturn(pedidos);
+
+        List<Pedido> resultado = pedidoService.listarPedidosDeUsuario(1L);
+
+        assertEquals(5, resultado.size());
+        assertEquals(EstadoPedido.RECIBIDO,       resultado.get(0).getEstado());
+        assertEquals(EstadoPedido.EN_PREPARACION, resultado.get(1).getEstado());
+        assertEquals(EstadoPedido.EN_REPARTO,     resultado.get(2).getEstado());
+        assertEquals(EstadoPedido.ENTREGADO,      resultado.get(3).getEstado());
+        assertEquals(EstadoPedido.CANCELADO,      resultado.get(4).getEstado());
     }
 }

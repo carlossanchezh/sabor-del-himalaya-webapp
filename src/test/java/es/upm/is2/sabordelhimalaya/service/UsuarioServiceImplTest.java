@@ -47,21 +47,39 @@ class UsuarioServiceImplTest {
     private UsuarioServiceImpl usuarioService;
 
     private RegistroUsuarioDTO dtoValido;
+    private Usuario usuarioActivo;
+    private Usuario usuarioInactivo;
 
     @BeforeEach
     void setUp() {
 
+        // DTO válido para registro
         dtoValido = new RegistroUsuarioDTO();
         dtoValido.setNombre("Usuario 1");
         dtoValido.setDireccion("Calle Falsa 123");
         dtoValido.setCorreo("usuario1@test.com");
         dtoValido.setLogin("usuario1");
         dtoValido.setContrasena("123456");
+
+        // Usuario activo: login y correo existentes, cuenta ya activada
+        usuarioActivo = new Usuario();
+        usuarioActivo.setIdUsuario(1L);
+        usuarioActivo.setLogin("usuario2");
+        usuarioActivo.setCorreo("usuario2@test.com");
+        usuarioActivo.setEstadoActivacion(true);
+
+        // Usuario inactivo: login y correo existentes, cuenta sin activar
+        usuarioInactivo = new Usuario();
+        usuarioInactivo.setIdUsuario(2L);
+        usuarioInactivo.setLogin("usuario3");
+        usuarioInactivo.setCorreo("usuario3@test.com");
+        usuarioInactivo.setEstadoActivacion(false);
     }
 
     @Test
-    @DisplayName("CPU-01.1: Registro válido guarda el usuario con datos correctos y cuenta inactiva")
+    @DisplayName("PU-01-01: Registro válido guarda el usuario con datos correctos y cuenta inactiva")
     void registrar_datosValidos_guardaUsuarioCorrectamente() {
+
         when(usuarioRepository.existsByCorreo(anyString())).thenReturn(false);
         when(usuarioRepository.existsByLogin(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("contrasenaCifradaMock");
@@ -88,8 +106,9 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-01.2: Rechaza el registro si el login ya existe")
+    @DisplayName("PU-01-02: Rechaza el registro si el login ya existe")
     void registrar_loginExistente_lanzaExcepcion() {
+
         when(usuarioRepository.existsByLogin(dtoValido.getLogin())).thenReturn(true);
 
         IllegalArgumentException  ex = assertThrows(
@@ -103,8 +122,9 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-01.3: Rechaza el registro si el correo ya existe")
+    @DisplayName("PU-01-03: Rechaza el registro si el correo ya existe")
     void registrar_correoExistente_lanzaExcepcion() {
+
         when(usuarioRepository.existsByCorreo(dtoValido.getCorreo())).thenReturn(true);
 
         IllegalArgumentException  ex = assertThrows(
@@ -118,8 +138,9 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-01.4: Registrar envía el correo con el mismo token que se guarda")
+    @DisplayName("PU-02-01: Registrar envía el correo con el mismo token que se guarda")
     void registrar_enviaCorreoConElMismoTokenGuardado() {
+
         when(usuarioRepository.existsByCorreo(anyString())).thenReturn(false);
         when(usuarioRepository.existsByLogin(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hash");
@@ -139,31 +160,23 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.1: Activar cuenta con token válido actualiza el estado y borra el token")
+    @DisplayName("PU-02-02: Activar cuenta con token válido actualiza el estado y borra el token")
     void activarCuenta_tokenValido_activaUsuario() {
 
-        Usuario usuarioInactivo = new Usuario();
-        usuarioInactivo.setIdUsuario(1L);
-        usuarioInactivo.setEstadoActivacion(false);
         usuarioInactivo.setTokenActivacion("token-valido-123");
-
         when(usuarioRepository.findByTokenActivacion("token-valido-123")).thenReturn(Optional.of(usuarioInactivo));
 
         boolean resultado = usuarioService.activarCuenta("token-valido-123");
 
         assertTrue(resultado);
 
-        // Capturamos el usuario para verificar que se ha modificado
-        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
-        verify(usuarioRepository).save(captor.capture());
-        Usuario usuarioGuardado = captor.getValue();
-
-        assertTrue(usuarioGuardado.getEstadoActivacion());
-        assertNull(usuarioGuardado.getTokenActivacion());
+        verify(usuarioRepository).save(usuarioInactivo);
+        assertTrue(usuarioInactivo.getEstadoActivacion());
+        assertNull(usuarioInactivo.getTokenActivacion());
     }
 
     @Test
-    @DisplayName("CPU-02.2: Activar cuenta con token inválido devuelve false y no guarda")
+    @DisplayName("PU-02-03: Activar cuenta con token inválido devuelve false y no guarda")
     void activarCuenta_tokenInvalido_devuelveFalse() {
 
         when(usuarioRepository.findByTokenActivacion("token-falso")).thenReturn(Optional.empty());
@@ -175,7 +188,7 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.3: Un token ya usado no se puede reutilizar")
+    @DisplayName("PU-02-04: Un token ya usado no se puede reutilizar")
     void activarCuenta_tokenYaUsado_devuelveFalse() {
 
         when(usuarioRepository.findByTokenActivacion("token-consumido"))
@@ -188,18 +201,15 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.4: Reenviar activación a cuenta ya activa lanza excepción")
+    @DisplayName("PU-02-05: Reenviar activación a cuenta ya activa lanza excepción")
     void reenviarActivacion_cuentaYaActiva_lanzaExcepcion() {
 
-        Usuario usuarioActivo = new Usuario();
-        usuarioActivo.setLogin("usuario1");
-        usuarioActivo.setEstadoActivacion(true);
-
-        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(usuarioActivo));
+        when(usuarioRepository.findByLogin("usuario2"))
+                .thenReturn(Optional.of(usuarioActivo));
 
         OperacionNoPermitidaException ex = assertThrows(
                 OperacionNoPermitidaException.class,
-                () -> usuarioService.reenviarActivacion("usuario1")
+                () -> usuarioService.reenviarActivacion("usuario2")
         );
 
         assertTrue(ex.getMessage().contains("ya está activada"));
@@ -209,45 +219,39 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.5: Reenviar activación a cuenta inactiva genera nuevo token y envía correo")
+    @DisplayName("PU-02-06: Reenviar activación a cuenta inactiva genera nuevo token y envía correo")
     void reenviarActivacion_cuentaInactiva_enviaCorreo() {
 
-        Usuario inactivo  = new Usuario();
-        inactivo .setLogin("usuario1");
-        inactivo .setEstadoActivacion(false);
-        inactivo.setTokenActivacion("token-viejo");
+        usuarioInactivo.setTokenActivacion("token-viejo");
+        when(usuarioRepository.findByLogin("usuario3"))
+                .thenReturn(Optional.of(usuarioInactivo));
 
-        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(inactivo));
+        usuarioService.reenviarActivacion("usuario3");
 
-        usuarioService.reenviarActivacion("usuario1");
-
-        verify(usuarioRepository).save(inactivo);
-        assertNotNull(inactivo .getTokenActivacion()); // Debe tener un token nuevo
-        assertNotEquals("token-viejo", inactivo.getTokenActivacion());
-        verify(emailService).enviarCorreoActivacion(eq(inactivo), anyString());
+        verify(usuarioRepository).save(usuarioInactivo);
+        assertNotNull(usuarioInactivo .getTokenActivacion()); // Debe tener un token nuevo
+        assertNotEquals("token-viejo", usuarioInactivo.getTokenActivacion());
+        verify(emailService).enviarCorreoActivacion(eq(usuarioInactivo), anyString());
     }
 
     @Test
-    @DisplayName("CPU-02.6: Reenviar activación por correo a cuenta inactiva genera nuevo token y envía correo")
+    @DisplayName("PU-02-07: Reenviar activación por correo a cuenta inactiva genera nuevo token y envía correo")
     void reenviarActivacion_porCorreo_enviaCorreo() {
 
-        Usuario inactivo = new Usuario();
-        inactivo.setCorreo("usuario1@test.com");
-        inactivo.setEstadoActivacion(false);
-        inactivo.setTokenActivacion("token-viejo");
+        usuarioInactivo.setTokenActivacion("token-viejo");
+        when(usuarioRepository.findByCorreo("usuario3@test.com"))
+                .thenReturn(Optional.of(usuarioInactivo));
 
-        when(usuarioRepository.findByCorreo("usuario1@test.com")).thenReturn(Optional.of(inactivo));
+        usuarioService.reenviarActivacion("usuario3@test.com");
 
-        usuarioService.reenviarActivacion("usuario1@test.com");
-
-        verify(usuarioRepository).save(inactivo);
-        assertNotNull(inactivo .getTokenActivacion()); // Debe tener un token nuevo
-        assertNotEquals("token-viejo", inactivo.getTokenActivacion());
-        verify(emailService).enviarCorreoActivacion(eq(inactivo), anyString());
+        verify(usuarioRepository).save(usuarioInactivo);
+        assertNotNull(usuarioInactivo .getTokenActivacion()); // Debe tener un token nuevo
+        assertNotEquals("token-viejo", usuarioInactivo.getTokenActivacion());
+        verify(emailService).enviarCorreoActivacion(eq(usuarioInactivo), anyString());
     }
 
     @Test
-    @DisplayName("CPU-02.7: Reenviar activación con correo inexistente lanza excepción")
+    @DisplayName("PU-02-08: Reenviar activación con correo inexistente lanza excepción")
     void reenviarActivacion_correoInexistente_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findByCorreo("noexiste@test.com"))
@@ -264,7 +268,7 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-02.8: Reenviar activación con login inexistente lanza excepción")
+    @DisplayName("PU-02-09: Reenviar activación con login inexistente lanza excepción")
     void reenviarActivacion_loginInexistente_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findByLogin("noexiste"))
@@ -281,18 +285,17 @@ class UsuarioServiceImplTest {
     }
 
     @Test
-    @DisplayName("CPU-03.1: buscarPorLogin devuelve el usuario si existe")
+    @DisplayName("PU-03-01: buscarPorLogin devuelve el usuario si existe")
     void buscarPorLogin_existe_devuelveUsuario() {
 
-        Usuario u = new Usuario();
-        u.setLogin("usuario1");
-        when(usuarioRepository.findByLogin("usuario1")).thenReturn(Optional.of(u));
+        when(usuarioRepository.findByLogin("usuario2"))
+                .thenReturn(Optional.of(usuarioActivo));
 
-        assertSame(u, usuarioService.buscarPorLogin("usuario1"));
+        assertSame(usuarioActivo, usuarioService.buscarPorLogin("usuario2"));
     }
 
     @Test
-    @DisplayName("CPU-03.2: buscarPorLogin lanza RecursoNoEncontrado si no existe")
+    @DisplayName("PU-03-02: buscarPorLogin lanza RecursoNoEncontrado si no existe")
     void buscarPorLogin_noExiste_lanzaRecursoNoEncontrado() {
 
         when(usuarioRepository.findByLogin("noexiste")).thenReturn(Optional.empty());

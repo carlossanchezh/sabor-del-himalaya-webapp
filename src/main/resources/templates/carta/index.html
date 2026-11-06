@@ -95,7 +95,7 @@
                                               th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
 
                                         <!-- Añadir producto al pedido -->
-                                        <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato})}"></form>
+                                        <form th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato}, ${'cat-' + st.index})}"></form>
 
                                     </div>
                                 </li>
@@ -118,6 +118,7 @@
                             <form th:if="${menuDisponible}" th:action="@{/pedidos/anadir-menu}" method="post">
                                 <input type="hidden" name="idMenuDiario" th:value="${menu.idMenuDiario}">
                                 <input type="hidden" name="cantidad" value="1">
+                                <input type="hidden" name="tabActiva" value="menu-del-dia">
 
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <div>
@@ -205,6 +206,17 @@
 
 <!-- Bootstrap JS Bundle (necesario para componentes interactivos como modales o pestañas) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Tras añadir un producto se vuelve a la pestaña desde la que se añadió (?tabActiva=...) -->
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        var tabActiva = /*[[${param.tabActiva != null ? param.tabActiva[0] : 'cat-0'}]]*/ 'cat-0';
+        var trigger = document.querySelector('[data-bs-target="#' + CSS.escape(tabActiva) + '"]');
+        if (trigger) {
+            new bootstrap.Tab(trigger).show();
+        }
+    });
+</script>
 
 </body>
 </html>

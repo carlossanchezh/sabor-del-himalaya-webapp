@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Controller
 @RequestMapping("/pedidos")
@@ -45,11 +46,35 @@ public class PedidosController {
     private static final List<EstadoPedido> PASOS_SEGUIMIENTO = List.of(
             EstadoPedido.RECIBIDO, EstadoPedido.EN_PREPARACION, EstadoPedido.EN_REPARTO, EstadoPedido.ENTREGADO);
 
+    // Máximo de unidades por línea de pedido (evita desbordamientos con cantidades enormes)
+    private static final int MAX_CANTIDAD = 99;
+    private static final String ERROR_CANTIDAD = "No se pueden pedir más de " + MAX_CANTIDAD + " unidades del mismo producto.";
+
+    // Pestañas de la carta (carta/index.html) para volver a la misma tras añadir un producto
+    private static final String TAB_POR_DEFECTO = "cat-0";
+    private static final String TAB_MENU = "menu-del-dia";
+    private static final List<String> TABS_CARTA = List.of("cat-0", "cat-1", "cat-2", "cat-3", TAB_MENU);
+
     private final PedidoService pedidoService;
     private final UsuarioService usuarioService;
 
     @PostMapping("/anadir-plato")
-    public String anadirPlato(@RequestParam Long idPlato, @RequestParam(defaultValue = "1") Integer cantidad, HttpSession session, RedirectAttributes redirectAttributes) {
+    public String anadirPlato(@RequestParam Long idPlato, @RequestParam(defaultValue = "1") Integer cantidad, @RequestParam(defaultValue = TAB_POR_DEFECTO) String tabActiva, HttpSession session, RedirectAttributes redirectAttributes) {
+
+        // Se conserva la pestaña de la carta desde la que se ha añadido el producto
+        redirectAttributes.addAttribute("tabActiva", tabValida(tabActiva));
+
+        PedidoTemporalDTO pedidoTemporal = PedidoTemporalDTO.deSesion(session);
+
+        // No se permiten más de 99 unidades por línea de pedido (contando las que ya hay en el pedido)
+        int yaEnPedido = pedidoTemporal.getLineasPlato().stream()
+                .filter(l -> l.getIdPlato().equals(idPlato))
+                .mapToInt(LineaPedidoPlatoDTO::getCantidad)
+                .sum();
+        if (cantidad == null || cantidad < 1 || cantidad > MAX_CANTIDAD - yaEnPedido) {
+            redirectAttributes.addFlashAttribute("error", ERROR_CANTIDAD);
+            return "redirect:/carta";
+        }
 
         // Crea la línea de pedido del producto añadido
         LineaPedidoPlatoDTO linea = new LineaPedidoPlatoDTO();
@@ -69,17 +94,42 @@ public class PedidosController {
         }
 
         // Se añade la línea de pedido del producto al pedido de la sesión
-        PedidoTemporalDTO.deSesion(session).anadirPlato(linea);
+        pedidoTemporal.anadirPlato(linea);
 
         return "redirect:/carta";
     }
 
     @PostMapping("/anadir-menu")
-    public String anadirMenu(@Valid @ModelAttribute LineaPedidoMenuDiarioDTO linea, BindingResult bindingResult, HttpSession session, RedirectAttributes redirectAttributes) {
+    public String anadirMenu(@Valid @ModelAttribute LineaPedidoMenuDiarioDTO linea, BindingResult bindingResult, @RequestParam(defaultValue = TAB_MENU) String tabActiva, HttpSession session, RedirectAttributes redirectAttributes) {
+
+        // Se conserva la pestaña del menú del día
+        redirectAttributes.addAttribute("tabActiva", tabValida(tabActiva));
+
+        // Cantidad fuera de rango (menos de 1 o más de 99)
+        if (bindingResult.hasFieldErrors("cantidad")) {
+            redirectAttributes.addFlashAttribute("error", ERROR_CANTIDAD);
+            return "redirect:/carta";
+        }
 
         // Si el formulario de selección del menú del día tiene errores se informa
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute("error", "Para añadir el menú del día elige un entrante, un principal, un postre y una bebida.");
+            return "redirect:/carta";
+        }
+
+        PedidoTemporalDTO pedidoTemporal = PedidoTemporalDTO.deSesion(session);
+
+        // No se permiten más de 99 menús con la misma selección (contando los que ya hay en el pedido)
+        int yaEnPedido = pedidoTemporal.getLineasMenu().stream()
+                .filter(l -> Objects.equals(l.getIdMenuDiario(), linea.getIdMenuDiario())
+                        && Objects.equals(l.getIdEntrante(), linea.getIdEntrante())
+                        && Objects.equals(l.getIdPrincipal(), linea.getIdPrincipal())
+                        && Objects.equals(l.getIdPostre(), linea.getIdPostre())
+                        && Objects.equals(l.getIdBebida(), linea.getIdBebida()))
+                .mapToInt(LineaPedidoMenuDiarioDTO::getCantidad)
+                .sum();
+        if (linea.getCantidad() > MAX_CANTIDAD - yaEnPedido) {
+            redirectAttributes.addFlashAttribute("error", ERROR_CANTIDAD);
             return "redirect:/carta";
         }
 
@@ -96,9 +146,14 @@ public class PedidosController {
         }
 
         // Se añade la línea de pedido de menú del día al pedido de la sesión
-        PedidoTemporalDTO.deSesion(session).anadirMenu(linea);
+        pedidoTemporal.anadirMenu(linea);
 
         return "redirect:/carta";
+    }
+
+    // Solo se aceptan las pestañas que existen en la carta; cualquier otro valor vuelve a «Entrantes»
+    private String tabValida(String tabActiva) {
+        return TABS_CARTA.contains(tabActiva) ? tabActiva : TAB_POR_DEFECTO;
     }
 
     @GetMapping("/revisar")
@@ -154,6 +209,12 @@ public class PedidosController {
 
             // El pedido temporal ha cambiado desde que se abrió la pantalla (p. ej. en otra pestaña) o falta alguna cantidad
             redirectAttributes.addFlashAttribute("error", "No se han podido guardar los cambios. Revisa las cantidades e inténtalo de nuevo.");
+            return "redirect:/pedidos/editar-pedido-temporal";
+        }
+
+        // No se permiten más de 99 unidades por línea de pedido
+        if ((cantidadesPlato != null && cantidadesPlato.stream().anyMatch(c -> c > MAX_CANTIDAD)) || (cantidadesMenu != null && cantidadesMenu.stream().anyMatch(c -> c > MAX_CANTIDAD))) {
+            redirectAttributes.addFlashAttribute("error", ERROR_CANTIDAD);
             return "redirect:/pedidos/editar-pedido-temporal";
         }
 

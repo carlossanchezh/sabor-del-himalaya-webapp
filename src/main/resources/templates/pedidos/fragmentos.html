@@ -4,9 +4,11 @@
 <body>
 
 <!-- Botón para añadir un plato específico al pedido temporal -->
-<form th:fragment="botonAnadirPlato(plato)" th:action="@{/pedidos/anadir-plato}" method="post" class="d-inline">
+<form th:fragment="botonAnadirPlato(plato, tabActiva)" th:action="@{/pedidos/anadir-plato}" method="post" class="d-inline">
     <input type="hidden" name="idPlato" th:value="${plato.idPlato}">
     <input type="hidden" name="cantidad" value="1">
+    <!-- Pestaña de la carta a la que se vuelve tras añadir el plato -->
+    <input type="hidden" name="tabActiva" th:value="${tabActiva}">
     <button type="submit" class="btn btn-success btn-sm"
             th:aria-label="'Añadir ' + ${plato.nombre} + ' al pedido'">+ Añadir</button>
 </form>

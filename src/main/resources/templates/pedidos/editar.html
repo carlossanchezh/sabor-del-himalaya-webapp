@@ -43,7 +43,7 @@
 
                             <!-- Input para cambiar la cantidad -->
                             <input type="number" class="form-control form-control-sm" style="width: 5rem"
-                                   min="0" required th:aria-label="'Cantidad de ' + ${linea.nombre}"
+                                   min="0" max="99" required th:aria-label="'Cantidad de ' + ${linea.nombre}"
                                    th:name="${linea.menu} ? 'cantidadesMenu' : 'cantidadesPlato'"
                                    th:value="${linea.cantidad}">
 

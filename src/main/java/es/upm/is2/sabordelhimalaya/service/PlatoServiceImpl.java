@@ -69,8 +69,11 @@ public class PlatoServiceImpl implements PlatoService {
         if (dto.getDescripcion() == null || dto.getDescripcion().isBlank()) {
             throw new IllegalArgumentException("La descripcion del plato es obligatoria.");
         }
-        if (dto.getPrecio() == null || dto.getPrecio().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("El precio del plato debe ser mayor que 0.");
+        if (dto.getPrecio() == null || dto.getPrecio().compareTo(new BigDecimal("0.01")) < 0) {
+            throw new IllegalArgumentException("El precio del plato debe ser de al menos 0.01.");
+        }
+        if(dto.getPrecio().compareTo(new BigDecimal("999999.99")) > 0){
+            throw new IllegalArgumentException("El precio del plato no puede superar 999999.99.");
         }
         if (dto.getCategoria() == null) {
             throw new IllegalArgumentException("Debes seleccionar la categoria del plato.");

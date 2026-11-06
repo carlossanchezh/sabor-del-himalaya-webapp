@@ -2,6 +2,7 @@ package es.upm.is2.sabordelhimalaya.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -23,6 +24,7 @@ public class RegistroUsuarioDTO {
 
     @NotBlank(message = "El nombre de usuario es obligatorio.")
     @Size(min = 4, max = 50, message = "El usuario debe tener entre 4 y 50 caracteres.")
+    @Pattern(regexp = "^[^@]+$", message = "El login no puede contener el símbolo @.")
     private String login;
 
     @NotBlank(message = "La contraseña es obligatoria.")

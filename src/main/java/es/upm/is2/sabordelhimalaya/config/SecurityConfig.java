@@ -1,5 +1,6 @@
 package es.upm.is2.sabordelhimalaya.config;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -30,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/staff/**").hasRole("STAFF")
                         .requestMatchers("/dueno/**").hasRole("DUENO")
                         .requestMatchers("/pedidos/**").hasRole("CLIENTE")
+                        .requestMatchers("/carta/**").hasRole("CLIENTE")
                         .anyRequest().authenticated() // rutas que requieren login
                 )
                 .formLogin(form -> form
@@ -69,7 +71,12 @@ public class SecurityConfig {
                 case "ROLE_CHEF" -> response.sendRedirect("/chef/carta");
                 case "ROLE_STAFF" -> response.sendRedirect("/staff/pedidos");
                 case "ROLE_DUENO" -> response.sendRedirect("/dueno/panel");
-                default -> response.sendRedirect("/carta"); // CLIENTE
+                case "ROLE_CLIENTE" -> response.sendRedirect("/carta");
+                default -> {
+                    // Si el login no tiene ningún rol invalida y lanza error 403
+                    request.getSession().invalidate();
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN, "Rol no reconocido: " + role);
+                }
             }
         };
     }

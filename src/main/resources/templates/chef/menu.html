@@ -50,6 +50,10 @@
                                     <option th:each="p : ${entrantesFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsEntrantes != null and menu.idsEntrantes.size() > i and menu.idsEntrantes[i] == p.idPlato}">Plato</option>
                                 </optgroup>
+                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(entrantesRetirados)}">
+                                    <option th:each="p : ${entrantesRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                            th:selected="${menu.idsEntrantes != null and menu.idsEntrantes.size() > i and menu.idsEntrantes[i] == p.idPlato}">Plato</option>
+                                </optgroup>
                             </select>
                         </div>
                     </div>
@@ -69,6 +73,10 @@
                                     <option th:each="p : ${principalesFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPrincipales != null and menu.idsPrincipales.size() > i and menu.idsPrincipales[i] == p.idPlato}">Plato</option>
                                 </optgroup>
+                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(principalesRetirados)}">
+                                    <option th:each="p : ${principalesRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                            th:selected="${menu.idsPrincipales != null and menu.idsPrincipales.size() > i and menu.idsPrincipales[i] == p.idPlato}">Plato</option>
+                                </optgroup>
                             </select>
                         </div>
                     </div>
@@ -86,6 +94,10 @@
                                 </optgroup>
                                 <optgroup label="Fuera de carta" th:unless="${#lists.isEmpty(postresFueraCarta)}">
                                     <option th:each="p : ${postresFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                            th:selected="${menu.idsPostres != null and menu.idsPostres.size() > i and menu.idsPostres[i] == p.idPlato}">Plato</option>
+                                </optgroup>
+                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(postresRetirados)}">
+                                    <option th:each="p : ${postresRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPostres != null and menu.idsPostres.size() > i and menu.idsPostres[i] == p.idPlato}">Plato</option>
                                 </optgroup>
                             </select>

@@ -128,25 +128,29 @@ public class ChefController {
     // Métodos auxiliares
     // ----------------------------------------------------------------
 
-    // Listas de los desplegables: platos de la carta y platos fuera de carta (creaciones del chef) de cada categoría
+    // Listas de los desplegables de cada categoría (CA13.4):
+    //  - platos de la carta
+    //  - platos fuera de carta creados por el chef
+    //  - platos del restaurante retirados de la carta
     private void cargarDatosFormulario(Model model, LocalDate hoy) {
 
         // Se cargan todos los platos del sistema
         List<Plato> todos = platoService.listarTodosPlatos();
 
-        // Filtra y carga los platos seleccionables por cada categoría
-
-        // Entrantes: platos de la carta + platos fuera de carta del chef
+        // Entrantes: carta + fuera de carta del chef + retirados
         model.addAttribute("entrantesCarta", filtrarCarta(todos, CategoriaPlato.ENTRANTE));
         model.addAttribute("entrantesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.ENTRANTE));
+        model.addAttribute("entrantesRetirados", filtrarRetirados(todos, CategoriaPlato.ENTRANTE));
 
-        // Principales: platos de la carta + platos fuera de carta del chef
+        // Principales: carta + fuera de carta del chef + retirados
         model.addAttribute("principalesCarta", filtrarCarta(todos, CategoriaPlato.PRINCIPAL));
         model.addAttribute("principalesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.PRINCIPAL));
+        model.addAttribute("principalesRetirados", filtrarRetirados(todos, CategoriaPlato.PRINCIPAL));
 
-        // Postres: platos de la carta + platos fuera de carta del chef
+        // Postres: carta + fuera de carta del chef + retirados
         model.addAttribute("postresCarta", filtrarCarta(todos, CategoriaPlato.POSTRE));
         model.addAttribute("postresFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.POSTRE));
+        model.addAttribute("postresRetirados", filtrarRetirados(todos, CategoriaPlato.POSTRE));
 
         // Fecha formateada
         model.addAttribute("fechaTexto", formatearFecha(hoy));
@@ -169,6 +173,17 @@ public class ChefController {
                 .filter(p -> p.getCategoria() == categoria)
                 .filter(p -> !Boolean.TRUE.equals(p.getEstaEnCarta()))
                 .filter(p -> Boolean.TRUE.equals(p.getEsDelChef()))
+                .sorted(Comparator.comparing(Plato::getNombre))
+                .toList();
+    }
+
+    // Platos del restaurante retirados de la carta (esta_en_carta=false Y es_del_chef=false) de una categoría (BUG-05, CA13.4)
+    private List<Plato> filtrarRetirados(List<Plato> platos, CategoriaPlato categoria) {
+
+        return platos.stream()
+                .filter(p -> p.getCategoria() == categoria)
+                .filter(p -> !Boolean.TRUE.equals(p.getEstaEnCarta()))
+                .filter(p -> !Boolean.TRUE.equals(p.getEsDelChef()))
                 .sorted(Comparator.comparing(Plato::getNombre))
                 .toList();
     }

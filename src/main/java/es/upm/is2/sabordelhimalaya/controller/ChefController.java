@@ -128,7 +128,7 @@ public class ChefController {
     // Métodos auxiliares
     // ----------------------------------------------------------------
 
-    // Listas de los desplegables de cada categoría (CA13.4):
+    // Listas de los desplegables de cada categoría:
     //  - platos de la carta
     //  - platos fuera de carta creados por el chef
     //  - platos del restaurante retirados de la carta
@@ -139,17 +139,17 @@ public class ChefController {
 
         // Entrantes: carta + fuera de carta del chef + retirados
         model.addAttribute("entrantesCarta", filtrarCarta(todos, CategoriaPlato.ENTRANTE));
-        model.addAttribute("entrantesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.ENTRANTE));
+        model.addAttribute("entrantesChef", filtrarChef(todos, CategoriaPlato.ENTRANTE));
         model.addAttribute("entrantesRetirados", filtrarRetirados(todos, CategoriaPlato.ENTRANTE));
 
         // Principales: carta + fuera de carta del chef + retirados
         model.addAttribute("principalesCarta", filtrarCarta(todos, CategoriaPlato.PRINCIPAL));
-        model.addAttribute("principalesFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.PRINCIPAL));
+        model.addAttribute("principalesChef", filtrarChef(todos, CategoriaPlato.PRINCIPAL));
         model.addAttribute("principalesRetirados", filtrarRetirados(todos, CategoriaPlato.PRINCIPAL));
 
         // Postres: carta + fuera de carta del chef + retirados
         model.addAttribute("postresCarta", filtrarCarta(todos, CategoriaPlato.POSTRE));
-        model.addAttribute("postresFueraCarta", filtrarFueraDeCartaDelChef(todos, CategoriaPlato.POSTRE));
+        model.addAttribute("postresChef", filtrarChef(todos, CategoriaPlato.POSTRE));
         model.addAttribute("postresRetirados", filtrarRetirados(todos, CategoriaPlato.POSTRE));
 
         // Fecha formateada
@@ -167,7 +167,7 @@ public class ChefController {
     }
 
     // Platos fuera de carta creados por el chef (esta_en_carta=false Y es_del_chef=true) de una categoría
-    private List<Plato> filtrarFueraDeCartaDelChef(List<Plato> platos, CategoriaPlato categoria) {
+    private List<Plato> filtrarChef(List<Plato> platos, CategoriaPlato categoria) {
 
         return platos.stream()
                 .filter(p -> p.getCategoria() == categoria)

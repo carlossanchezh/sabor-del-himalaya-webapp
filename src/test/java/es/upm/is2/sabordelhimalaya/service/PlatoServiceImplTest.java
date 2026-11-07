@@ -334,12 +334,14 @@ class PlatoServiceImplTest {
     @DisplayName("PU-17-05-01: Rechaza el plato si el nombre ya existe")
     void anadirPlatoALaCarta_nombreDuplicado_lanzaError() {
 
-        when(platoRepository.findAll()).thenReturn(List.of(entranteEnCarta, principalEnCarta, postreEnCarta, bebidaEnCarta));
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse("Principal Carta"))
+                .thenReturn(true);
 
         PlatoCreacionDTO dto = dto("Principal Carta", "Otra descripción", "10.00", CategoriaPlato.PRINCIPAL);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> platoService.anadirPlatoALaCarta(dto));
+
         assertTrue(ex.getMessage().toLowerCase().contains("ya existe"));
         verify(platoRepository, never()).save(any());
     }
@@ -348,15 +350,34 @@ class PlatoServiceImplTest {
     @DisplayName("PU-17-05-02: Rechaza plato con nombre duplicado ignorando espacios y mayúsculas")
     void anadirPlatoALaCarta_nombreDuplicadoIgnorandoEspacios_lanzaError() {
 
-        when(platoRepository.findAll())
-                .thenReturn(List.of(principalEnCarta)); // se llama "Principal Carta"
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse("Principal Carta"))
+                .thenReturn(true);
 
-        PlatoCreacionDTO dto = dto("  PRINCIPAL CARTA  ", "otra", "10.00", CategoriaPlato.PRINCIPAL);
+        PlatoCreacionDTO dto = dto("  Principal Carta  ", "otra", "10.00", CategoriaPlato.PRINCIPAL);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> platoService.anadirPlatoALaCarta(dto));
+
         assertTrue(ex.getMessage().toLowerCase().contains("ya existe"));
         verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-17-05-03: Permite el nombre de un plato del chef")
+    void anadirPlatoALaCarta_nombreIgualAPlatoDelChef_permiteCrear() {
+
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse("Postre del Chef"))
+                .thenReturn(false);
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PlatoCreacionDTO dto = dto("Postre del Chef", "Descripción 32", "10.00", CategoriaPlato.POSTRE);
+
+        Plato resultado = platoService.anadirPlatoALaCarta(dto);
+
+        assertEquals("Postre del Chef", resultado.getNombre());
+        assertTrue(resultado.getEstaEnCarta());
+        assertFalse(resultado.getEsDelChef());
+        verify(platoRepository).save(any(Plato.class));
     }
 
     @Test

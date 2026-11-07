@@ -80,11 +80,10 @@ public class PlatoServiceImpl implements PlatoService {
         }
 
         // Validar que no existe un plato con ese nombre ya
-        boolean existePlato = platoRepository.findAll().stream()
-                .anyMatch(p -> p.getNombre().equalsIgnoreCase(dto.getNombre().trim()));
+        boolean existePlato = platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse(dto.getNombre().trim());
 
         if (existePlato) {
-            throw new IllegalArgumentException("Ya existe un plato con el nombre '" + dto.getNombre().trim() + "'. Si estaba retirado, usa la opción 'Añadir plato' de la lista de retirados.");
+            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + dto.getNombre().trim() + "'. Si estaba retirado, usa la opción 'Añadir Producto' de la lista de retirados.");
         }
 
         // Crear nuevo plato

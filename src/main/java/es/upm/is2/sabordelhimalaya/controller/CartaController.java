@@ -13,6 +13,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -29,7 +30,7 @@ public class CartaController {
     private final MenuDiarioService menuDiarioService;
 
     @GetMapping
-    public String mostrarCarta(Model model) {
+    public String mostrarCarta(@RequestParam(defaultValue = "cat-0") String tabActiva, Model model) {
 
         // Carta agrupada por categorías
         Map<String, List<Plato>> carta = new LinkedHashMap<>();
@@ -38,6 +39,7 @@ public class CartaController {
         carta.put("Postres", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.POSTRE)));
         carta.put("Bebidas", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.BEBIDA)));
         model.addAttribute("carta", carta);
+        model.addAttribute("tabActiva", tabActiva);
 
         // Fecha del día de hoy
         LocalDate hoy = LocalDate.now();

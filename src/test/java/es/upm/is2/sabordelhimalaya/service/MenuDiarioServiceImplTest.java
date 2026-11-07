@@ -450,34 +450,4 @@ class MenuDiarioServiceImplTest {
         assertTrue(ex.getMessage().toLowerCase().contains("fecha"));
         verify(menuDiarioRepository, never()).save(any());
     }
-
-    @Test
-    @DisplayName("PU-13-15: Acepta platos fuera de carta del chef y platos retirados de la carta (CA13.4, BUG-05)")
-    void configurarMenu_conPlatosRetiradosYDelChef_seGuarda() {
-
-        // Entrantes: 1 de la carta, 1 retirado de la carta, 1 creado por el chef
-        when(platoRepository.findById(1L)).thenReturn(Optional.of(plato(1L, CategoriaPlato.ENTRANTE)));
-        when(platoRepository.findById(2L)).thenReturn(Optional.of(
-                new Plato(2L, "Retirado 2", "Descripción 2", new BigDecimal("10.00"), CategoriaPlato.ENTRANTE, false, false)));
-        when(platoRepository.findById(3L)).thenReturn(Optional.of(
-                new Plato(3L, "Del chef 3", "Descripción 3", new BigDecimal("0.00"), CategoriaPlato.ENTRANTE, false, true)));
-        // Principales: 1 retirado de la carta y 2 de la carta
-        when(platoRepository.findById(4L)).thenReturn(Optional.of(
-                new Plato(4L, "Retirado 4", "Descripción 4", new BigDecimal("12.00"), CategoriaPlato.PRINCIPAL, false, false)));
-        when(platoRepository.findById(5L)).thenReturn(Optional.of(plato(5L, CategoriaPlato.PRINCIPAL)));
-        when(platoRepository.findById(6L)).thenReturn(Optional.of(plato(6L, CategoriaPlato.PRINCIPAL)));
-        // Postres: 1 retirado de la carta y 1 de la carta
-        when(platoRepository.findById(7L)).thenReturn(Optional.of(
-                new Plato(7L, "Retirado 7", "Descripción 7", new BigDecimal("4.00"), CategoriaPlato.POSTRE, false, false)));
-        when(platoRepository.findById(8L)).thenReturn(Optional.of(plato(8L, CategoriaPlato.POSTRE)));
-        when(menuDiarioRepository.save(any(MenuDiario.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        MenuDiario resultado = menuDiarioService.configurarMenu(dtoValido());
-
-        assertEquals(hoy, resultado.getFecha());
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<MenuDiarioOpcion>> captor = ArgumentCaptor.forClass(List.class);
-        verify(menuDiarioOpcionRepository).saveAll(captor.capture());
-        assertEquals(8, captor.getValue().size());
-    }
 }

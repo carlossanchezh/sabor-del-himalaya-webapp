@@ -26,13 +26,13 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="h4 mb-0">Carta del restaurante</h2>
 
-                <!-- Botón para abrir el modal de añadir plato -->
+                <!-- Botón para abrir el modal de añadir producto -->
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
-                    Añadir plato
+                    Añadir Producto
                 </button>
             </div>
 
-            <p th:if="${#lists.isEmpty(platos)}" class="text-muted">Todavía no hay platos en la carta.</p>
+            <p th:if="${#lists.isEmpty(platos)}" class="text-muted">Todavía no hay productos en la carta.</p>
 
             <div class="table-responsive" th:unless="${#lists.isEmpty(platos)}">
                 <table class="table table-hover align-middle">
@@ -60,17 +60,17 @@
     </div>
 </main>
 
-<!-- Pop-up con los platos retirados y la opción de crear uno nuevo -->
+<!-- Pop-up con los productos retirados y la opción de crear uno nuevo -->
 <div class="modal fade" id="modalAnadirPlato" tabindex="-1" aria-labelledby="tituloAnadirPlato" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title h5" id="tituloAnadirPlato">Añadir plato a la carta</h3>
+                <h3 class="modal-title h5" id="tituloAnadirPlato">Añadir producto a la carta</h3>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
 
             <div class="modal-body">
-                <p th:if="${#lists.isEmpty(platosRetirados)}" class="text-muted mb-0">No hay platos retirados de la carta.</p>
+                <p th:if="${#lists.isEmpty(platosRetirados)}" class="text-muted mb-0">No hay productos retirados de la carta.</p>
 
                 <ul class="list-group" th:unless="${#lists.isEmpty(platosRetirados)}">
                     <li class="list-group-item d-flex justify-content-between align-items-center gap-3"
@@ -89,20 +89,20 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
-                    + Crear plato nuevo
+                    + Crear producto nuevo
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Pop-up para añadir un plato nuevo a la carta -->
+<!-- Pop-up para añadir un producto nuevo a la carta -->
 <div class="modal fade" id="modalNuevoPlato" tabindex="-1" aria-labelledby="tituloNuevoPlato" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <form th:action="@{/dueno/platos/nuevo}" th:object="${nuevoPlato}" method="post">
                 <div class="modal-header">
-                    <h3 class="modal-title h5" id="tituloNuevoPlato">Crear nuevo plato</h3>
+                    <h3 class="modal-title h5" id="tituloNuevoPlato">Crear nuevo producto</h3>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
 
@@ -147,7 +147,7 @@
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Guardar plato</button>
+                    <button type="submit" class="btn btn-success">Guardar producto</button>
                 </div>
             </form>
         </div>

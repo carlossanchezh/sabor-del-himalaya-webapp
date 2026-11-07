@@ -42,15 +42,15 @@
                             <select class="form-select mb-2" name="idsEntrantes" required
                                     th:each="i : ${#numbers.sequence(0, 2)}">
                                 <option value="" th:text="'Entrante ' + ${i + 1}">Entrante</option>
-                                <optgroup label="De la carta">
+                                <optgroup label="De Carta">
                                     <option th:each="p : ${entrantesCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsEntrantes != null and menu.idsEntrantes.size() > i and menu.idsEntrantes[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Fuera de carta" th:unless="${#lists.isEmpty(entrantesFueraCarta)}">
-                                    <option th:each="p : ${entrantesFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                <optgroup label="Del Chef" th:unless="${#lists.isEmpty(entrantesChef)}">
+                                    <option th:each="p : ${entrantesChef}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsEntrantes != null and menu.idsEntrantes.size() > i and menu.idsEntrantes[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(entrantesRetirados)}">
+                                <optgroup label="Fuera de Carta" th:unless="${#lists.isEmpty(entrantesRetirados)}">
                                     <option th:each="p : ${entrantesRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsEntrantes != null and menu.idsEntrantes.size() > i and menu.idsEntrantes[i] == p.idPlato}">Plato</option>
                                 </optgroup>
@@ -65,15 +65,15 @@
                             <select class="form-select mb-2" name="idsPrincipales" required
                                     th:each="i : ${#numbers.sequence(0, 2)}">
                                 <option value="" th:text="'Principal ' + ${i + 1}">Principal</option>
-                                <optgroup label="De la carta">
+                                <optgroup label="De Carta">
                                     <option th:each="p : ${principalesCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPrincipales != null and menu.idsPrincipales.size() > i and menu.idsPrincipales[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Fuera de carta" th:unless="${#lists.isEmpty(principalesFueraCarta)}">
-                                    <option th:each="p : ${principalesFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                <optgroup label="Del Chef" th:unless="${#lists.isEmpty(principalesChef)}">
+                                    <option th:each="p : ${principalesChef}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPrincipales != null and menu.idsPrincipales.size() > i and menu.idsPrincipales[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(principalesRetirados)}">
+                                <optgroup label="Fuera de Carta" th:unless="${#lists.isEmpty(principalesRetirados)}">
                                     <option th:each="p : ${principalesRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPrincipales != null and menu.idsPrincipales.size() > i and menu.idsPrincipales[i] == p.idPlato}">Plato</option>
                                 </optgroup>
@@ -88,15 +88,15 @@
                             <select class="form-select mb-2" name="idsPostres" required
                                     th:each="i : ${#numbers.sequence(0, 1)}">
                                 <option value="" th:text="'Postre ' + ${i + 1}">Postre</option>
-                                <optgroup label="De la carta">
+                                <optgroup label="De Carta">
                                     <option th:each="p : ${postresCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPostres != null and menu.idsPostres.size() > i and menu.idsPostres[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Fuera de carta" th:unless="${#lists.isEmpty(postresFueraCarta)}">
-                                    <option th:each="p : ${postresFueraCarta}" th:value="${p.idPlato}" th:text="${p.nombre}"
+                                <optgroup label="Del Chef" th:unless="${#lists.isEmpty(postresChef)}">
+                                    <option th:each="p : ${postresChef}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPostres != null and menu.idsPostres.size() > i and menu.idsPostres[i] == p.idPlato}">Plato</option>
                                 </optgroup>
-                                <optgroup label="Retirados de la carta" th:unless="${#lists.isEmpty(postresRetirados)}">
+                                <optgroup label="Fuera de Carta" th:unless="${#lists.isEmpty(postresRetirados)}">
                                     <option th:each="p : ${postresRetirados}" th:value="${p.idPlato}" th:text="${p.nombre}"
                                             th:selected="${menu.idsPostres != null and menu.idsPostres.size() > i and menu.idsPostres[i] == p.idPlato}">Plato</option>
                                 </optgroup>

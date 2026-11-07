@@ -31,7 +31,7 @@ public class Usuario {
 
     @NotBlank
     @Email
-    @Column(name = "correo", nullable = false, length = 150)
+    @Column(name = "correo", nullable = false, unique = true, length = 150)
     private String correo;
 
     @NotBlank

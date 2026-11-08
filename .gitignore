@@ -12,9 +12,6 @@ logs/
 .env
 .env.*
 
-# Ignorar configuración local con contraseñas
-src/main/resources/application.properties
-
 ### STS ###
 .apt_generated
 .classpath

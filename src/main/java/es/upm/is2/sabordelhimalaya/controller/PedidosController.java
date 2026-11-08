@@ -14,6 +14,7 @@ import es.upm.is2.sabordelhimalaya.service.UsuarioService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Controller
 @RequestMapping("/pedidos")
 @RequiredArgsConstructor
@@ -280,6 +282,8 @@ public class PedidosController {
 
             return "redirect:/pedidos/revisar";
         }
+
+        log.info("Pedido #{} confirmado por usuario='{}' ({} €)", pedidoConfirmado.getIdPedido(), authentication.getName(), pedidoConfirmado.getImporteTotal());
 
         // Se vacia el pedido temporal de la sesión
         pedidoTemporal.vaciar();

@@ -9,6 +9,7 @@ import es.upm.is2.sabordelhimalaya.service.UsuarioService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Controller;
@@ -17,6 +18,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+@Slf4j
 @Controller
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -46,6 +48,8 @@ public class AuthController {
 
             // Registrar al usuario
             usuarioService.registrar(dto);
+
+            log.info("Nuevo usuario registrado: login='{}', correo='{}'", dto.getLogin(), dto.getCorreo());
 
             // Pasamos el login y el correo para usarlos en la pantalla de registro exitoso
             redirectAttributes.addFlashAttribute("login", dto.getLogin());

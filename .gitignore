@@ -4,6 +4,10 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Logs
+logs/
+*.log
+
 # Ignorar configuración local con contraseñas
 src/main/resources/application.properties
 

@@ -3,12 +3,15 @@ package es.upm.is2.sabordelhimalaya.service;
 import es.upm.is2.sabordelhimalaya.model.Usuario;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
@@ -31,8 +34,14 @@ public class EmailServiceImpl implements EmailService {
         mensaje.setSubject("Activa tu cuenta en Sabor del Himalaya");
         mensaje.setText("Hola " + usuario.getNombre() + ",\n\n" + "Gracias por registrarte en Sabor del Himalaya.\n" + "Para activar tu cuenta, haz clic en el siguiente enlace:\n\n" + enlace + "\n\n" + "Si no has solicitado esto, ignora este correo.");
 
-        // Envío del email
-        mailSender.send(mensaje);
+        try {
 
+            // Envío del email
+            mailSender.send(mensaje);
+
+        } catch(MailException e) {
+
+            log.error("Error al enviar correo de activación a {} (login: {})", usuario.getCorreo(), usuario.getLogin(), e);
+        }
     }
 }

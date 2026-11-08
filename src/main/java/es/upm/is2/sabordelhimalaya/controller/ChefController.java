@@ -8,6 +8,7 @@ import es.upm.is2.sabordelhimalaya.service.PlatoService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+@Slf4j
 @Controller
 @RequestMapping("/chef")
 @RequiredArgsConstructor
@@ -94,6 +96,7 @@ public class ChefController {
 
             // Configuración del menú del día
             menuDiarioService.configurarMenu(menu);
+            log.info("Menú diario configurado para {} ", hoy);
 
         } catch (IllegalArgumentException e) {
 

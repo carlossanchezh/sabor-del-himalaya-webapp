@@ -8,6 +8,10 @@ target/
 logs/
 *.log
 
+# Docker / secretos
+.env
+.env.*
+
 # Ignorar configuración local con contraseñas
 src/main/resources/application.properties
 

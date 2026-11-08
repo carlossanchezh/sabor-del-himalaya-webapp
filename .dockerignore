@@ -1,0 +1,23 @@
+# Compilados y artefactos
+target/
+logs/
+*.log
+*.md
+
+# Control de versiones y CI
+.git/
+.github/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Compose / base de datos 
+docker-compose.yml
+database/

@@ -11,6 +11,9 @@ import java.util.List;
 @Repository
 public interface PlatoRepository extends JpaRepository<Plato, Long> {
 
+    // Comprueba si ya hay un plato con ese nombre en la carta o retirado (ignora los creados por el chef)
+    boolean existsByNombreIgnoreCaseAndEsDelChefFalse(String nombre);
+
     // Lista de platos visibles en la carta
     List<Plato> findByEstaEnCartaTrue();
 

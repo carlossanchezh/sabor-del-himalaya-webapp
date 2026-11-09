@@ -4,8 +4,13 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-# Ignorar configuración local con contraseñas
-src/main/resources/application.properties
+# Logs
+logs/
+*.log
+
+# Docker / secretos
+.env
+.env.*
 
 ### STS ###
 .apt_generated

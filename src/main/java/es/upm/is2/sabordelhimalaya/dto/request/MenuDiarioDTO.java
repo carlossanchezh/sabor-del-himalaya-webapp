@@ -1,7 +1,8 @@
-package es.upm.is2.sabordelhimalaya.dto;
+package es.upm.is2.sabordelhimalaya.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 public class MenuDiarioDTO {
 
     @NotNull
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) // el formulario envía la fecha como "2026-10-22"
     private LocalDate fecha;
 
     @NotNull

@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.0.45, for Win64 (x86_64)
 --
--- Host: 127.0.0.1    Database: sabor_himalaya
+-- Host: localhost    Database: sabor_himalaya
 -- ------------------------------------------------------
 -- Server version	9.6.0
 
@@ -18,12 +18,6 @@ SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
 SET @@SESSION.SQL_LOG_BIN= 0;
 
 --
--- GTID state at the beginning of the backup 
---
-
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'acaf68a9-1e56-11f1-9118-0a0027000014:1-334';
-
---
 -- Table structure for table `linea_pedido_menudiario`
 --
 
@@ -39,14 +33,14 @@ CREATE TABLE `linea_pedido_menudiario` (
   `id_postre` bigint NOT NULL,
   `id_bebida` bigint NOT NULL,
   `cantidad` int NOT NULL,
-  `precio_unitario` decimal(8,2) NOT NULL DEFAULT '15.00',
+  `precio_unitario` decimal(8,2) NOT NULL,
   PRIMARY KEY (`id_linea_pedido_menu_diario`),
   KEY `fk_lpmd_pedido` (`id_pedido`),
   KEY `fk_lpmd_menu` (`id_menu_diario`),
   KEY `fk_lpmd_entrante` (`id_entrante`),
   KEY `fk_lpmd_principal` (`id_principal`),
-  KEY `fk_lpmd_bebida` (`id_bebida`),
   KEY `fk_lpmd_postre` (`id_postre`),
+  KEY `fk_lpmd_bebida` (`id_bebida`),
   CONSTRAINT `fk_lpmd_bebida` FOREIGN KEY (`id_bebida`) REFERENCES `plato` (`id_plato`),
   CONSTRAINT `fk_lpmd_entrante` FOREIGN KEY (`id_entrante`) REFERENCES `plato` (`id_plato`),
   CONSTRAINT `fk_lpmd_menu` FOREIGN KEY (`id_menu_diario`) REFERENCES `menu_diario` (`id_menu_diario`),
@@ -224,6 +218,7 @@ CREATE TABLE `usuario` (
   `rol` enum('CLIENTE','DUENO','CHEF','STAFF') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CLIENTE',
   `token` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id_usuario`),
+  UNIQUE KEY `Correo` (`correo`),
   UNIQUE KEY `Login` (`login`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -247,4 +242,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-20 14:35:31
+-- Dump completed on 2026-10-30  9:57:07

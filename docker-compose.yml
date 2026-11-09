@@ -1,0 +1,53 @@
+name: sabor-del-himalaya
+
+services:
+  db:
+    image: mysql:8
+    container_name: sabor-del-himalaya-db
+    networks:
+      - sabor-del-himalaya-net
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE:  ${DB_NAME:-sabor_himalaya}
+    ports:
+      - "${DB_PORT_HOST:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/sabor_himalaya.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    image: carlossanchezh/sabor-del-himalaya-webapp:latest
+    container_name: sabor-del-himalaya-app
+    networks:
+      - sabor-del-himalaya-net
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      LOG_FILE: /app/logs/sabor-del-himalaya.log
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - ./logs:/app/logs
+
+networks:
+  sabor-del-himalaya-net:
+    driver: bridge
+
+volumes:
+  db_data:

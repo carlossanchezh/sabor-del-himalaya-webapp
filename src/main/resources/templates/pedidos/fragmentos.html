@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+
+<body>
+
+<!-- Botón para añadir un plato específico al pedido temporal -->
+<form th:fragment="botonAnadirPlato(plato, tabActiva)" th:action="@{/pedidos/anadir-plato}" method="post" class="d-inline">
+    <input type="hidden" name="idPlato" th:value="${plato.idPlato}">
+    <input type="hidden" name="cantidad" value="1">
+    <!-- Pestaña de la carta a la que se vuelve tras añadir el plato -->
+    <input type="hidden" name="tabActiva" th:value="${tabActiva}">
+    <button type="submit" class="btn btn-success btn-sm"
+            th:aria-label="'Añadir ' + ${plato.nombre} + ' al pedido'">+ Añadir</button>
+</form>
+
+<!-- Panel lateral "Mi pedido" -->
+<div th:fragment="miPedido" class="card">
+    <div class="card-body">
+        <h2 class="h4">Mi pedido</h2>
+
+        <!-- Mensaje de aviso si el pedido se ha vaciado automáticamente (ej. un plato fue retirado de la carta) -->
+        <div class="alert alert-warning small" th:if="${errorPedidoTemporal}" th:text="${errorPedidoTemporal}"></div>
+
+        <!-- Estado vacío -->
+        <div class="text-center text-muted py-4" th:if="${resumenPedidoTemporal.estaVacio()}">
+            <p class="mb-1">Tu pedido está vacío</p>
+            <p class="small mb-0">Añade platos de la carta o un menú del día.</p>
+        </div>
+
+        <!-- Lista de productos añadidos -->
+        <ul class="list-unstyled mb-3" th:unless="${resumenPedidoTemporal.estaVacio()}">
+            <li class="d-flex justify-content-between small py-1" th:each="linea : ${resumenPedidoTemporal.lineas}">
+                <span>
+                    <span th:text="${linea.cantidad} + '× ' + ${linea.nombre}">2× Nombre del producto</span>
+                    <span class="d-block text-muted" th:if="${linea.detalle}" th:text="${linea.detalle}"></span>
+                </span>
+                <span th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+            </li>
+        </ul>
+
+        <!-- Total del pedido -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-bold">Total</span>
+            <span class="fs-4 text-success"
+                  th:text="${#numbers.formatDecimal(resumenPedidoTemporal.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+        </div>
+
+        <!-- Botón para ir a revisar el pedido -->
+        <a class="btn btn-success w-100" th:href="@{/pedidos/revisar}" th:unless="${resumenPedidoTemporal.estaVacio()}">Revisar pedido</a>
+
+        <!-- Botón deshabilitado si el pedido está vacío -->
+        <button type="button" class="btn btn-secondary w-100" disabled th:if="${resumenPedidoTemporal.estaVacio()}">Revisar pedido</button>
+    </div>
+</div>
+
+</body>
+</html>

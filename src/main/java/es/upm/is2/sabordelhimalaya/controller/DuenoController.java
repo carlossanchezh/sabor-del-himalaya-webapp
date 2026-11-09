@@ -1,35 +1,96 @@
 package es.upm.is2.sabordelhimalaya.controller;
 
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
+import es.upm.is2.sabordelhimalaya.model.Plato;
+import es.upm.is2.sabordelhimalaya.service.PlatoService;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.ui.Model;
+import jakarta.validation.Valid;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.Comparator;
 
 @Controller
 @RequestMapping("/dueno")
+@RequiredArgsConstructor 
 public class DuenoController {
 
+    private final PlatoService platoService;
+
     @GetMapping("/panel")
-    public String panel() {
-        // TODO (US-15): Cargar la carta (platos) para mostrarla.
+    public String panel(Model model) {
         // TODO (US-19): Calcular la facturación del día de hoy y pasarla al modelo.
-        // TODO (P18): Crear HTML "dueno/panel"
-        // P18: Panel de gestión (Ver Carta + Ver Facturación del día) botones de editar añadir y eliminar platos
+
+        // Formulario vacío para añadir paltos nuevos
+        model.addAttribute("nuevoPlato", new PlatoCreacionDTO());
+
+        // Carga los platos del sistema
+        cargarCarta(model);
+
         return "dueno/panel";
     }
 
     @PostMapping("/platos/nuevo")
-    public String guardarNuevoPlato() {
-        // TODO (US-17): Recibir datos, llamar a PlatoService.anadirPlatoALaCarta().
-        // Guardar el plato nuevo en la carta
-        // TODO (P20/P21): Crear HTML
-        // P20/P21: Formulario para añadir un plato completamente nuevo (es un pop up dentro de dueno/panel)
+    public String guardarNuevoPlato(@Valid @ModelAttribute("nuevoPlato") PlatoCreacionDTO nuevoPlato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+
+        // Validación del formulario
+        if(bindingResult.hasErrors()){
+
+            // Informa de los errores y vuelve a abrir el modal
+            model.addAttribute("mostrarModal", true);
+
+            // Carga los platos del sistema
+            cargarCarta(model);
+
+            return "dueno/panel";
+        }
+
+        try {
+
+            // Añadir plato nuevo a la carta
+            platoService.anadirPlatoALaCarta(nuevoPlato);
+
+        } catch (IllegalArgumentException e) {
+
+            // Manejo de excepciones y muestra el modal nuevamente
+            model.addAttribute("error", e.getMessage());
+            model.addAttribute("mostrarModal", true);
+
+            // Carga los platos del sistema
+            cargarCarta(model);
+
+            return "dueno/panel";
+        }
+
+        // Mensaje de éxito del plato añadido
+        redirectAttributes.addFlashAttribute("mensaje", "Plato '" + nuevoPlato.getNombre().trim() + "' añadido a la carta.");
+
         return "redirect:/dueno/panel";
     }
 
-
     @PostMapping("/platos/{id}/anadir-existente")
-    public String anadirPlatoExistente(@PathVariable Long id) {
-        // TODO (US-17): Llamar a PlatoService.anadirPlatoExistenteALaCarta(id).
-        // P20: Añadir a la carta un plato que ya existía en el sistema
+    public String anadirPlatoExistente(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+
+        try {
+
+            // Poner plato retirado visible en carta
+            Plato plato = platoService.anadirPlatoExistenteALaCarta(id);
+
+            // Mensaje de éxito plato retirado añadido
+            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + plato.getNombre() + "' añadido de nuevo a la carta.");
+
+        } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
+
+            // Manejo de errores
+            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
+        }
+
         return "redirect:/dueno/panel";
     }
 
@@ -50,5 +111,24 @@ public class DuenoController {
         // TODO (P22): Crear HTML
         // P22: pop up de confirmar eliminación dentro de dueno/panel
         return "redirect:/dueno/panel";
+    }
+
+    // ----------------------------------------------------------------
+    // Métodos auxiliares
+    // ----------------------------------------------------------------
+
+    // Carta ordenada por categoria (entrante, principal, postre y bebida) (platos en carta y etirados)
+    private void cargarCarta(Model model){
+
+        // Ordena los platos de la carta
+        model.addAttribute("platos", platoService.listarCarta().stream()
+        .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());
+
+        // Carga las categorías
+        model.addAttribute("categorias", CategoriaPlato.values());
+
+        // Carga los platos retirados de la carta ordenados
+        model.addAttribute("platosRetirados", platoService.listarPlatosRetiradosDeLaCarta().stream()
+        .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());
     }
 }

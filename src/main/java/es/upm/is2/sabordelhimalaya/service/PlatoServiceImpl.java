@@ -83,7 +83,7 @@ public class PlatoServiceImpl implements PlatoService {
         boolean existePlato = platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse(dto.getNombre().trim());
 
         if (existePlato) {
-            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + dto.getNombre().trim() + "'. Si estaba retirado, usa la opción 'Añadir Producto' de la lista de retirados.");
+            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + dto.getNombre().trim() + "' en carta o retirado de ella.");
         }
 
         // Crear nuevo plato

@@ -204,8 +204,23 @@ public class PedidoServiceImpl implements PedidoService {
 
     @Override
     public BigDecimal calcularFacturacion(LocalDate fecha) {
-        // TODO (US-19): Obtener pedidos del día y sumar importeTotal (excluyendo cancelados).
-        throw new UnsupportedOperationException("TODO US-19");
+
+        if (fecha == null) {
+            throw new IllegalArgumentException("Se debe indicar la fecha de la que calcular la facturación.");
+        }
+
+        // Obtiene todos los pedidos entregados y que están en el rango de la fecha
+        List<Pedido> pedidosFacturacion = pedidoRepository.findByEstadoAndFechaHoraBetween(EstadoPedido.ENTREGADO, fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        // Calcula la suma total de todos los pedidos
+        for (Pedido pedido : pedidosFacturacion) {
+            total = total.add(pedido.getImporteTotal());
+        }
+
+        // Redondea la facturación total
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override

@@ -18,8 +18,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     // pedidos de un usuario de más reciente a más antiguo
     List<Pedido> findByUsuarioIdUsuarioOrderByFechaHoraDesc(Long idUsuario);
 
-    // pedidos en un determinado estado
-    List<Pedido> findByEstado(EstadoPedido estado);
+    // pedidos de un determinado estado y entre dos fechas
+    List<Pedido> findByEstadoAndFechaHoraBetween(EstadoPedido estado, LocalDateTime inicio, LocalDateTime fin);
 
     // pedidos entre dos fechas
     List<Pedido> findByFechaHoraBetween(LocalDateTime inicio, LocalDateTime fin);

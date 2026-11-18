@@ -4,9 +4,11 @@ import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.model.Plato;
+import es.upm.is2.sabordelhimalaya.service.PedidoService;
 import es.upm.is2.sabordelhimalaya.service.PlatoService;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.ui.Model;
@@ -14,7 +16,11 @@ import jakarta.validation.Valid;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 
 @Controller
 @RequestMapping("/dueno")
@@ -22,10 +28,19 @@ import java.util.Comparator;
 public class DuenoController {
 
     private final PlatoService platoService;
+    private final PedidoService pedidoService;
 
     @GetMapping("/panel")
-    public String panel(Model model) {
-        // TODO (US-19): Calcular la facturación del día de hoy y pasarla al modelo.
+    public String panel(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha, Model model) {
+
+        LocalDate dia = (fecha != null) ? fecha : LocalDate.now();
+
+        model.addAttribute("fechaConsultada", dia);
+        model.addAttribute("esHoy", dia.equals(LocalDate.now()));
+        model.addAttribute("facturacionDia", pedidoService.calcularFacturacion(dia));
+
+        // Facturación de los últimos 7 días
+        cargarFacturacionSemanal(model);
 
         // Formulario vacío para añadir paltos nuevos
         model.addAttribute("nuevoPlato", new PlatoCreacionDTO());
@@ -45,6 +60,12 @@ public class DuenoController {
             // Informa de los errores y vuelve a abrir el modal
             model.addAttribute("mostrarModal", true);
 
+            // Carga la facturación del día
+            cargarFacturacion(model);
+
+            // Facturación de los últimos 7 días
+            cargarFacturacionSemanal(model);
+
             // Carga los platos del sistema
             cargarCarta(model);
 
@@ -58,14 +79,10 @@ public class DuenoController {
 
         } catch (IllegalArgumentException e) {
 
-            // Manejo de excepciones y muestra el modal nuevamente
-            model.addAttribute("error", e.getMessage());
-            model.addAttribute("mostrarModal", true);
+            // Manejo de excepciones
+            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
 
-            // Carga los platos del sistema
-            cargarCarta(model);
-
-            return "dueno/panel";
+            return "redirect:/dueno/panel";
         }
 
         // Mensaje de éxito del plato añadido
@@ -130,5 +147,35 @@ public class DuenoController {
         // Carga los platos retirados de la carta ordenados
         model.addAttribute("platosRetirados", platoService.listarPlatosRetiradosDeLaCarta().stream()
         .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());
+    }
+
+    // Facturación del día
+    private void cargarFacturacion(Model model) {
+
+        LocalDate dia = LocalDate.now();
+
+        model.addAttribute("fechaConsultada", dia);
+        model.addAttribute("esHoy", true);
+        model.addAttribute("facturacionDia", pedidoService.calcularFacturacion(dia));
+    }
+
+    // Facturación de los últimos 7 días
+    private void cargarFacturacionSemanal(Model model) {
+
+        LocalDate hoy = LocalDate.now();
+        DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM");
+
+        List<String> etiquetas = new ArrayList<>();
+        List<Double> valores = new ArrayList<>();
+
+        // Del día más antiguo (hace 6 días) al más reciente (hoy)
+        for (int i = 6; i >= 0; i--) {
+            LocalDate dia = hoy.minusDays(i);
+            etiquetas.add(dia.format(formato));
+            valores.add(pedidoService.calcularFacturacion(dia).doubleValue());
+        }
+
+        model.addAttribute("graficaEtiquetas", etiquetas);
+        model.addAttribute("graficaValores", valores);
     }
 }

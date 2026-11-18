@@ -9,54 +9,114 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
 </head>
-<body class="bg-light">
+<body class="bg-light d-flex flex-column" style="height: 100vh; overflow: hidden;">
 
 <!-- Layout -->
 <div th:replace="~{layout :: header}"></div>
 
-<main class="container mt-4">
+<!-- Contenido principal: ocupa el resto del viewport -->
+<main class="container-fluid px-3 py-3 d-flex flex-column flex-grow-1" style="min-height: 0;">
 
-    <!-- Mensajes de éxito o error -->
-    <div th:if="${mensaje}" class="alert alert-success" th:text="${mensaje}">Mensaje</div>
-    <div th:if="${errorCarta}" class="alert alert-danger" th:text="${errorCarta}">Error</div>
-
-    <!-- Carta del restaurante -->
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="h4 mb-0">Carta del restaurante</h2>
-
-                <!-- Botón para abrir el modal de añadir producto -->
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
-                    Añadir Producto
-                </button>
-            </div>
-
-            <p th:if="${#lists.isEmpty(platos)}" class="text-muted">Todavía no hay productos en la carta.</p>
-
-            <div class="table-responsive" th:unless="${#lists.isEmpty(platos)}">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Descripción</th>
-                        <th>Categoría</th>
-                        <th class="text-end">Precio</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="plato : ${platos}">
-                        <td class="fw-semibold" th:text="${plato.nombre}">Nombre</td>
-                        <td class="text-muted" th:text="${plato.descripcion}">Descripción</td>
-                        <td><span class="badge text-bg-secondary" th:text="${plato.categoria}">CATEGORIA</span></td>
-                        <td class="text-end fw-semibold"
-                            th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <!-- Botones de editar (US-16) y eliminar (US-18) y la facturación (US-19) se añaden en el Sprint 2 -->
+    <!-- Mensajes de éxito o error (encuadrados) -->
+    <div class="d-flex justify-content-center flex-shrink-0">
+        <div style="width: 100%; max-width: 1476px;">
+            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show mb-2" th:text="${mensaje}">Mensaje</div>
+            <div th:if="${errorCarta}" class="alert alert-danger alert-dismissible fade show mb-2" th:text="${errorCarta}">Error</div>
         </div>
+    </div>
+
+    <!-- Fila de contenido: carta (izquierda) + facturación (derecha) -->
+    <div class="d-flex gap-3 flex-grow-1 justify-content-center" style="min-height: 0;">
+
+        <!-- Columna Izquierda Carta -->
+        <section class="d-flex align-self-start"
+                 style="flex: 1 1 0; max-width: 1100px; height: 75vh; min-width: 0; min-height: 0;">
+            <div class="card shadow-sm flex-grow-1 d-flex flex-column" style="min-height: 0;">
+
+                <!-- Cabecera fija de la carta -->
+                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-shrink-0">
+                    <h2 class="h5 mb-0">Carta del restaurante</h2>
+
+                    <!-- Botón para abrir el modal de añadir producto -->
+                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
+                        Añadir Producto
+                    </button>
+                </div>
+
+                <!-- Único bloque con scroll -->
+                <div class="card-body p-0" style="overflow-y: auto;">
+
+                    <p th:if="${#lists.isEmpty(platos)}" class="text-muted text-center py-5 mb-0">
+                        Todavía no hay productos en la carta.
+                    </p>
+
+                    <table class="table table-hover align-middle mb-0" th:unless="${#lists.isEmpty(platos)}">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Categoría</th>
+                            <th class="text-end">Precio</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="plato : ${platos}">
+                            <td class="fw-semibold" th:text="${plato.nombre}">Nombre</td>
+                            <td class="text-muted" th:text="${plato.descripcion}">Descripción</td>
+                            <td><span class="badge text-bg-secondary" th:text="${plato.categoria}">CATEGORIA</span></td>
+                            <td class="text-end fw-semibold"
+                                th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Columna Derecha Facturación -->
+        <aside class="d-flex flex-column gap-3 flex-shrink-0 align-self-start"
+               style="width: 360px; height: 75vh; overflow-y: auto;">
+
+            <!-- Facturación del día -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+
+                    <h2 class="h5 mb-1">Facturación</h2>
+                    <small class="text-muted d-block mb-2">
+                        <span th:if="${esHoy}">Hoy · </span>
+                        <span th:text="${#temporals.format(fechaConsultada, 'dd/MM/yyyy')}">--</span>
+                    </small>
+
+                    <span class="fs-2 fw-bold text-success d-block mb-3"
+                          th:text="${#numbers.formatDecimal(facturacionDia, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+
+                    <!-- Selector de fecha -->
+                    <form th:action="@{/dueno/panel}" method="get" class="d-flex flex-column gap-2">
+                        <input type="date" name="fecha" class="form-control form-control-sm"
+                               th:value="${fechaConsultada}">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm flex-fill">Consultar</button>
+                            <a th:unless="${esHoy}" th:href="@{/dueno/panel}"
+                               class="btn btn-secondary btn-sm flex-fill">Hoy</a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+
+            <!-- Gráfica de facturación de los últimos 7 días -->
+            <div class="card shadow-sm flex-grow-1 d-flex flex-column" style="min-height: 0;">
+                <div class="card-header bg-white py-2 flex-shrink-0">
+                    <h3 class="h6 mb-0">Facturación en los últimos 7 días</h3>
+                </div>
+                <div class="card-body p-2 flex-grow-1" style="position: relative; min-height: 0;">
+                    <canvas id="graficaSemanal"></canvas>
+                </div>
+            </div>
+
+        </aside>
+
     </div>
 </main>
 
@@ -78,7 +138,8 @@
                         <div>
                             <div class="fw-semibold" th:text="${retirado.nombre}">Nombre</div>
                             <small class="text-muted"
-                                   th:text="${retirado.categoria + ' · ' + #numbers.formatDecimal(retirado.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">CATEGORIA · 0,00 €</small>
+                                   th:text="${retirado.categoria + ' · ' + #numbers.formatDecimal(retirado.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">CATEGORIA · 0,00 €
+                            </small>
                         </div>
                         <form th:action="@{/dueno/platos/{id}/anadir-existente(id=${retirado.idPlato})}" method="post" class="m-0">
                             <button type="submit" class="btn btn-outline-success btn-sm">Añadir</button>
@@ -88,7 +149,7 @@
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
+                <button type="button" class="btn btn-success w-100" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
                     + Crear producto nuevo
                 </button>
             </div>
@@ -154,12 +215,76 @@
     </div>
 </div>
 
+<!-- Chart.js (para la gráfica) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
 <!-- Bootstrap JS Bundle (necesario para componentes interactivos como modales o pestañas) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Si el formulario tenía errores, se vuelve a abrir el pop-up al cargar la página -->
 <script th:if="${mostrarModal}">
     new bootstrap.Modal(document.getElementById('modalNuevoPlato')).show();
+</script>
+
+<!-- Reset al abrir el modal -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('modalNuevoPlato');
+        if (!modal) return;
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            if (!event.relatedTarget) return;
+
+            this.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(el => {
+                if (el.tagName === 'SELECT') {
+                    el.selectedIndex = 0;
+                } else {
+                    el.value = '';
+                }
+                el.classList.remove('is-invalid', 'is-valid');
+            });
+        });
+    });
+</script>
+
+<!-- Gráfica de facturación semanal -->
+<script th:inline="javascript">
+    const etiquetas = /*[[${graficaEtiquetas}]]*/ [];
+    const valores   = /*[[${graficaValores}]]*/ [];
+
+    const ctx = document.getElementById('graficaSemanal');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: etiquetas,
+            datasets: [{
+                label: 'Facturación (€)',
+                data: valores,
+                backgroundColor: 'rgba(25, 135, 84, 0.55)',
+                borderColor: 'rgba(25, 135, 84, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => item.parsed.y.toFixed(2) + ' €'
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: (v) => v + ' €' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
 </script>
 
 </body>

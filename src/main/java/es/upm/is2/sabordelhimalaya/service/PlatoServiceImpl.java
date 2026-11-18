@@ -39,8 +39,8 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarPlatosDelChef() {
-        // TODO (US-14): return platoRepository.findByEsDelChefTrue();
-        throw new UnsupportedOperationException("TODO US-14");
+        // Platos creados por el chef (siempre fuera de carta) para reutilizarlos en los menús diarios
+        return platoRepository.findByEsDelChefTrue();
     }
 
     @Override
@@ -50,10 +50,59 @@ public class PlatoServiceImpl implements PlatoService {
     }
 
     @Override
+    @Transactional
     public Plato crearPlatoFueraDeCarta(PlatoCreacionDTO dto) {
-        // TODO (US-14): Crear Plato con estaEnCarta=false, esDelChef=true.
-        // Poner precio del palto creado por el chef a 0
-        throw new UnsupportedOperationException("TODO US-14");
+
+        if (dto == null) {
+            throw new IllegalArgumentException("Debes indicar los datos del plato.");
+        }
+        if (dto.getNombre() == null || dto.getNombre().isBlank()) {
+            throw new IllegalArgumentException("El nombre del plato es obligatorio.");
+        }
+        if (dto.getNombre().trim().length() > 120) {
+            throw new IllegalArgumentException("El nombre del plato no puede superar 120 caracteres.");
+        }
+        if (dto.getDescripcion() == null || dto.getDescripcion().isBlank()) {
+            throw new IllegalArgumentException("La descripción del plato es obligatoria.");
+        }
+        if (dto.getDescripcion().trim().length() > 255) {
+            throw new IllegalArgumentException("La descripción del plato no puede superar 255 caracteres.");
+        }
+        if (dto.getCategoria() == null) {
+            throw new IllegalArgumentException("Debes seleccionar la categoría del plato.");
+        }
+
+        // El menú diario solo tiene entrantes, principales y postres: las bebidas no se crean aquí
+        if (dto.getCategoria() == CategoriaPlato.BEBIDA) {
+            throw new IllegalArgumentException("Los platos fuera de carta solo pueden ser entrantes, principales o postres.");
+        }
+
+        String nombre = dto.getNombre().trim();
+
+        // Validar que el chef no tiene ya un plato con ese nombre (sin distinguir mayúsculas)
+        boolean existePlato = platoRepository.findByEsDelChefTrue().stream()
+                .anyMatch(p -> p.getNombre() != null && p.getNombre().trim().equalsIgnoreCase(nombre));
+
+        if (existePlato) {
+            throw new IllegalArgumentException("Ya tienes un plato fuera de carta llamado '" + nombre + "'.");
+        }
+
+        // Crear nuevo plato
+        Plato plato = new Plato();
+
+        // Añadir nombre, descripción y categoría
+        plato.setNombre(nombre);
+        plato.setDescripcion(dto.getDescripcion().trim());
+        plato.setCategoria(dto.getCategoria());
+
+        // Los platos del chef no tienen precio propio: se sirven dentro del menú diario
+        plato.setPrecio(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+
+        // Plato fuera de carta creado por el chef
+        plato.setEstaEnCarta(false);
+        plato.setEsDelChef(true);
+
+        return platoRepository.save(plato);
     }
 
     @Override

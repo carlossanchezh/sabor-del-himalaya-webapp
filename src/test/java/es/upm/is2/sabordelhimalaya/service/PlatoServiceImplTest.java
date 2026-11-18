@@ -29,6 +29,7 @@ import static org.mockito.Mockito.*;
  - US-04 (Cliente ver carta)
  - US-12 (Chef ver carta)
  - US-15 (Dueño ver carta)
+ - US-14 (Chef crear plato fuera de carta)
  - US-17 (Dueño añadir plato)
  */
 
@@ -436,5 +437,138 @@ class PlatoServiceImplTest {
 
         assertEquals(retirados, resultado);
         verify(platoRepository).findByEstaEnCartaFalseAndEsDelChefFalse();
+    }
+
+    // ----------------------------------------------------------------
+    // US-14: Chef crear plato fuera de carta
+    // ----------------------------------------------------------------
+
+    @Test
+    @DisplayName("PU-14-01: Plato válido se guarda fuera de carta, del chef y con precio 0")
+    void crearPlatoFueraDeCarta_valido_guardaPlatoDelChef() {
+
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Plato resultado = platoService.crearPlatoFueraDeCarta(dtoValido);
+
+        ArgumentCaptor<Plato> captor = ArgumentCaptor.forClass(Plato.class);
+        verify(platoRepository).save(captor.capture());
+        Plato guardado = captor.getValue();
+
+        assertSame(guardado, resultado);
+        assertEquals("Plato 5", guardado.getNombre());
+        assertEquals("Descripción 5", guardado.getDescripcion());
+        assertEquals(CategoriaPlato.ENTRANTE, guardado.getCategoria());
+        assertEquals(new BigDecimal("0.00"), guardado.getPrecio());
+        assertFalse(guardado.getEstaEnCarta());
+        assertTrue(guardado.getEsDelChef());
+    }
+
+    @Test
+    @DisplayName("PU-14-02: Quita los espacios del nombre y la descripción")
+    void crearPlatoFueraDeCarta_limpiaEspacios() {
+
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PlatoCreacionDTO conEspacios = dto("  Crema de calabaza  ", "  Con jengibre  ", null, CategoriaPlato.PRINCIPAL);
+
+        Plato resultado = platoService.crearPlatoFueraDeCarta(conEspacios);
+
+        assertEquals("Crema de calabaza", resultado.getNombre());
+        assertEquals("Con jengibre", resultado.getDescripcion());
+        assertEquals(new BigDecimal("0.00"), resultado.getPrecio());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-01: Rechaza el plato si el nombre está vacío")
+    void crearPlatoFueraDeCarta_nombreVacio_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("   ", "Descripción", null, CategoriaPlato.POSTRE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("nombre"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-02: Rechaza el plato si la descripción está vacía")
+    void crearPlatoFueraDeCarta_descripcionVacia_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Plato 8", "", null, CategoriaPlato.POSTRE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("descripción"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-03: Rechaza el plato si no tiene categoría")
+    void crearPlatoFueraDeCarta_sinCategoria_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Plato 9", "Descripción", null, null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("categoría"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-04: Rechaza una bebida (el menú diario solo tiene entrantes, principales y postres)")
+    void crearPlatoFueraDeCarta_bebida_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Zumo", "Natural", null, CategoriaPlato.BEBIDA);
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-05-01: Rechaza un nombre que el chef ya usa, ignorando espacios y mayúsculas")
+    void crearPlatoFueraDeCarta_nombreRepetidoDelChef_lanzaError() {
+
+        when(platoRepository.findByEsDelChefTrue()).thenReturn(List.of(entranteDelChef));
+
+        PlatoCreacionDTO dto = dto("  entrante DEL chef ", "Otra descripción", null, CategoriaPlato.ENTRANTE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("Ya tienes"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-05-02: Permite el nombre de un plato de la carta")
+    void crearPlatoFueraDeCarta_nombreIgualAPlatoDeCarta_permiteCrear() {
+
+        when(platoRepository.findByEsDelChefTrue()).thenReturn(List.of(entranteDelChef, principalDelChef));
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PlatoCreacionDTO dto = dto("Entrante Carta", "Versión del chef", null, CategoriaPlato.ENTRANTE);
+
+        Plato resultado = platoService.crearPlatoFueraDeCarta(dto);
+
+        assertEquals("Entrante Carta", resultado.getNombre());
+        assertTrue(resultado.getEsDelChef());
+        verify(platoRepository).save(any(Plato.class));
+    }
+
+    @Test
+    @DisplayName("PU-14-06: Rechaza la petición si no llegan datos")
+    void crearPlatoFueraDeCarta_dtoNulo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(null));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-07: listarPlatosDelChef devuelve los platos creados por el chef")
+    void listarPlatosDelChef_devuelveLosDelRepositorio() {
+
+        List<Plato> delChef = List.of(entranteDelChef, principalDelChef, postreDelChef);
+        when(platoRepository.findByEsDelChefTrue()).thenReturn(delChef);
+
+        List<Plato> resultado = platoService.listarPlatosDelChef();
+
+        assertEquals(delChef, resultado);
+        verify(platoRepository).findByEsDelChefTrue();
     }
 }

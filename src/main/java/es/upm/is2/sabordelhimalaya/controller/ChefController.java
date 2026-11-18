@@ -1,6 +1,7 @@
 package es.upm.is2.sabordelhimalaya.controller;
 
 import es.upm.is2.sabordelhimalaya.dto.request.MenuDiarioDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.model.Plato;
 import es.upm.is2.sabordelhimalaya.service.MenuDiarioService;
@@ -49,6 +50,9 @@ public class ChefController {
         LocalDate hoy = LocalDate.now();
         model.addAttribute("fechaHoy", formatearFecha(hoy));
         model.addAttribute("menuConfigurado", menuDiarioService.consultarMenuDeFecha(hoy).isPresent());
+
+        // Platos fuera de carta creados por el chef (US-14)
+        model.addAttribute("platosChef", ordenarPlatos(platoService.listarPlatosDelChef()));
         return "chef/carta";
     }
 
@@ -113,17 +117,42 @@ public class ChefController {
     }
 
     @GetMapping("/platos/nuevo")
-    public String mostrarNuevoPlato() {
-        // TODO (P17): Crear HTML "chef/nuevo-plato"
-        // P17: Formulario para crear un plato fuera de carta (para menús futuros)
-        // En chef/nuevo-plato.html añadir campo oculto <input type="hidden" name="precio" value="0"> para que no falle
+    public String mostrarNuevoPlato(Model model) {
+
+        // Formulario vacío para crear un plato fuera de carta (US-14)
+        model.addAttribute("plato", new PlatoCreacionDTO());
+        cargarCategoriasPlatoChef(model);
+
         return "chef/nuevo-plato";
     }
 
     @PostMapping("/platos/nuevo")
-    public String guardarPlatoFueraDeCarta() {
-        // TODO (US-14): Recibir datos y llamar a PlatoService.crearPlatoFueraDeCarta().
-        // Guardar el plato fuera de carta en la base de datos
+    public String guardarPlatoFueraDeCarta(@ModelAttribute("plato") PlatoCreacionDTO plato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+
+        // Errores de binding (por ejemplo, una categoría que no existe)
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("error", "Los datos del formulario no son válidos. Revisa el plato.");
+            cargarCategoriasPlatoChef(model);
+            return "chef/nuevo-plato";
+        }
+
+        try {
+
+            // Guardar el plato fuera de carta (precio 0, esta_en_carta=false, es_del_chef=true)
+            Plato creado = platoService.crearPlatoFueraDeCarta(plato);
+            log.info("Plato fuera de carta creado: {} ({})", creado.getNombre(), creado.getCategoria());
+
+            // Mensaje de éxito al crear el plato
+            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + creado.getNombre() + "' guardado. Ya puedes elegirlo al configurar el menú diario.");
+
+        } catch (IllegalArgumentException e) {
+
+            // Errores de validación (nombre o descripción vacíos, sin categoría, bebida, nombre repetido...)
+            model.addAttribute("error", e.getMessage());
+            cargarCategoriasPlatoChef(model);
+            return "chef/nuevo-plato";
+        }
+
         return "redirect:/chef/carta";
     }
 
@@ -189,6 +218,12 @@ public class ChefController {
                 .filter(p -> !Boolean.TRUE.equals(p.getEsDelChef()))
                 .sorted(Comparator.comparing(Plato::getNombre))
                 .toList();
+    }
+
+    // Categorías que puede tener un plato del chef: las del menú diario (sin bebidas)
+    private void cargarCategoriasPlatoChef(Model model) {
+
+        model.addAttribute("categorias", List.of(CategoriaPlato.ENTRANTE, CategoriaPlato.PRINCIPAL, CategoriaPlato.POSTRE));
     }
 
     // Ordenar una lista de platos alfabéticamente por nombre

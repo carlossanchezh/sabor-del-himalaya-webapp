@@ -82,7 +82,31 @@
                     </div>
                 </div>
             </div>
-            <!-- "Platos fuera de carta" + botón "Crear plato" (US-14) se añade en el Sprint 2 -->
+            <!-- Platos fuera de carta creados por el chef (US-14) -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-body">
+                    <h2 class="h4 mb-3">Platos fuera de carta</h2>
+
+                    <p th:if="${#lists.isEmpty(platosChef)}" class="text-muted">
+                        Todavía no has creado platos fuera de carta.
+                    </p>
+
+                    <ul class="list-group mb-3" th:unless="${#lists.isEmpty(platosChef)}">
+                        <li class="list-group-item d-flex justify-content-between align-items-start"
+                            th:each="plato : ${platosChef}">
+                            <div>
+                                <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
+                                <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
+                            </div>
+                            <span class="badge text-bg-secondary"
+                                  th:text="${#strings.capitalize(#strings.toLowerCase(plato.categoria.name()))}">Categoría</span>
+                        </li>
+                    </ul>
+
+                    <a th:href="@{/chef/platos/nuevo}" class="btn btn-outline-primary w-100">Crear plato</a>
+                </div>
+            </div>
+
         </div>
 
     </div>

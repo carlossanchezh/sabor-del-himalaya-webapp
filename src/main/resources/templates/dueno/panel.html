@@ -57,6 +57,7 @@
                             <th>Descripción</th>
                             <th>Categoría</th>
                             <th class="text-end">Precio</th>
+                            <th class="text-end">Acciones</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -66,6 +67,21 @@
                             <td><span class="badge text-bg-secondary" th:text="${plato.categoria}">CATEGORIA</span></td>
                             <td class="text-end fw-semibold"
                                 th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</td>
+
+                            <!-- Botones de editar (US-16) y eliminar (US-18): los datos del plato van en atributos data-* -->
+                            <td class="text-end text-nowrap">
+                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                        data-bs-toggle="modal" data-bs-target="#modalEditarPlato"
+                                        th:data-id="${plato.idPlato}"
+                                        th:data-nombre="${plato.nombre}"
+                                        th:data-descripcion="${plato.descripcion}"
+                                        th:data-precio="${plato.precio}"
+                                        th:data-categoria="${plato.categoria}">Editar</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                        data-bs-toggle="modal" data-bs-target="#modalEliminarPlato"
+                                        th:data-id="${plato.idPlato}"
+                                        th:data-nombre="${plato.nombre}">Eliminar</button>
+                            </td>
                         </tr>
                         </tbody>
                     </table>
@@ -215,6 +231,86 @@
     </div>
 </div>
 
+<!-- P19: Pop-up para modificar un producto de la carta (US-16) -->
+<div class="modal fade" id="modalEditarPlato" tabindex="-1" aria-labelledby="tituloEditarPlato" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formEditarPlato" th:action="@{/dueno/platos/{id}/editar(id=${platoEditado.idPlato ?: 0})}"
+                  th:data-base="@{/dueno/platos/}" th:object="${platoEditado}" method="post">
+                <div class="modal-header">
+                    <h3 class="modal-title h5" id="tituloEditarPlato">Modificar producto</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="editarIdPlato" th:field="*{idPlato}">
+
+                    <div class="mb-3">
+                        <label for="editarNombre" class="form-label">Nombre</label>
+                        <input type="text" id="editarNombre" class="form-control" th:field="*{nombre}"
+                               th:classappend="${#fields.hasErrors('nombre')} ? 'is-invalid'" maxlength="120" required>
+                        <span class="invalid-feedback" th:if="${#fields.hasErrors('nombre')}" th:errors="*{nombre}"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editarDescripcion" class="form-label">Descripción</label>
+                        <textarea id="editarDescripcion" class="form-control" rows="3" th:field="*{descripcion}"
+                                  th:classappend="${#fields.hasErrors('descripcion')} ? 'is-invalid'" maxlength="255" required></textarea>
+                        <span class="invalid-feedback" th:if="${#fields.hasErrors('descripcion')}" th:errors="*{descripcion}"></span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label for="editarPrecio" class="form-label">Precio (€)</label>
+                            <input type="number" id="editarPrecio" class="form-control" th:field="*{precio}"
+                                   th:classappend="${#fields.hasErrors('precio')} ? 'is-invalid'" min="0.01" max="999999.99" step="0.01" required>
+                            <span class="invalid-feedback" th:if="${#fields.hasErrors('precio')}" th:errors="*{precio}"></span>
+                        </div>
+                        <div class="col-6">
+                            <label for="editarCategoria" class="form-label">Categoría</label>
+                            <select id="editarCategoria" class="form-select" th:field="*{categoria}"
+                                    th:classappend="${#fields.hasErrors('categoria')} ? 'is-invalid'" required>
+                                <option value="">Selecciona...</option>
+                                <option th:each="cat : ${categorias}" th:value="${cat}" th:text="${cat}">CATEGORIA</option>
+                            </select>
+                            <span class="invalid-feedback" th:if="${#fields.hasErrors('categoria')}" th:errors="*{categoria}"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- P22: Pop-up para confirmar que se retira un producto de la carta (US-18) -->
+<div class="modal fade" id="modalEliminarPlato" tabindex="-1" aria-labelledby="tituloEliminarPlato" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="formEliminarPlato" th:action="@{/dueno/platos/0/eliminar}" th:data-base="@{/dueno/platos/}" method="post">
+                <div class="modal-header">
+                    <h3 class="modal-title h5" id="tituloEliminarPlato">Eliminar producto de la carta</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="mb-2">¿Seguro que quieres eliminar <strong id="nombreEliminar">este producto</strong> de la carta?</p>
+                    <small class="text-muted">Los clientes dejarán de verlo, pero no se borra: podrás volver a añadirlo desde «Añadir Producto».</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Chart.js (para la gráfica) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
@@ -224,6 +320,41 @@
 <!-- Si el formulario tenía errores, se vuelve a abrir el pop-up al cargar la página -->
 <script th:if="${mostrarModal}">
     new bootstrap.Modal(document.getElementById('modalNuevoPlato')).show();
+</script>
+
+<!-- Si el formulario de edición tenía errores, se vuelve a abrir su pop-up -->
+<script th:if="${mostrarModalEditar}">
+    new bootstrap.Modal(document.getElementById('modalEditarPlato')).show();
+</script>
+
+<!-- Rellenar los pop-ups de editar y eliminar con los datos del plato pulsado -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        const modalEditar = document.getElementById('modalEditarPlato');
+        modalEditar.addEventListener('show.bs.modal', function (event) {
+            const boton = event.relatedTarget;
+            if (!boton) return; // Se abre tras un error: conserva lo que envió el dueño
+
+            const form = document.getElementById('formEditarPlato');
+            form.action = form.dataset.base + boton.dataset.id + '/editar';
+            document.getElementById('editarIdPlato').value = boton.dataset.id;
+            document.getElementById('editarNombre').value = boton.dataset.nombre;
+            document.getElementById('editarDescripcion').value = boton.dataset.descripcion;
+            document.getElementById('editarPrecio').value = boton.dataset.precio;
+            document.getElementById('editarCategoria').value = boton.dataset.categoria;
+
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        });
+
+        const modalEliminar = document.getElementById('modalEliminarPlato');
+        modalEliminar.addEventListener('show.bs.modal', function (event) {
+            const boton = event.relatedTarget;
+            const form = document.getElementById('formEliminarPlato');
+            form.action = form.dataset.base + boton.dataset.id + '/eliminar';
+            document.getElementById('nombreEliminar').textContent = boton.dataset.nombre;
+        });
+    });
 </script>
 
 <!-- Reset al abrir el modal -->

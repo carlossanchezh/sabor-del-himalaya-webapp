@@ -1,6 +1,7 @@
 package es.upm.is2.sabordelhimalaya.controller;
 
 import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoModificacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.model.Plato;
@@ -112,21 +113,43 @@ public class DuenoController {
     }
 
     @PostMapping("/platos/{id}/editar")
-    public String guardarEdicionPlato(@PathVariable Long id) {
-        // TODO (US-16): Recibir datos, llamar a PlatoService.modificarPlato().
-        // Guardar los cambios del plato editado
-        // TODO (P19): Crear HTML
-        // P19: Formulario para editar un plato existente (es un pop up dentro de dueno/panel)
+    public String guardarEdicionPlato(@PathVariable Long id, @Valid @ModelAttribute("platoEditado") PlatoModificacionDTO platoEditado, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+        // El plato que se modifica es el de la URL
+        platoEditado.setIdPlato(id);
+
+        // Validacion de formulario
+        if(bindingResult.hasErrors()){
+
+            // Informa de los errores y abre modal de edicion
+            model.addAttribute("mostrarModalEditar", true);
+            cargarFacturacion(model);
+            cargarFacturacionSemanal(model);
+            cargarCarta(model);
+            return "dueno/panel";
+        }
+
+        try {
+            // Guardar cambios del plato modificado
+            Plato plato = platoService.modificarPlato(platoEditado);
+            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + plato.getNombre() + "' modificado.");            
+        } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
+            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
+        }
         return "redirect:/dueno/panel";
     }
 
 
     @PostMapping("/platos/{id}/eliminar")
-    public String eliminarPlato(@PathVariable Long id) {
-        // TODO (US-18): Llamar a PlatoService.retirarPlatoDeLaCarta(id).
-        // Eliminar (retirar) plato de la carta (Borrado lógico)
-        // TODO (P22): Crear HTML
-        // P22: pop up de confirmar eliminación dentro de dueno/panel
+    public String eliminarPlato(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            // Nombre para el mensaje
+            String nombre = platoService.buscarPorId(id).getNombre();
+            // Retirar plato de la carta
+            platoService.retirarPlatoDeLaCarta(id);
+            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + nombre + "' retirado de la carta. Puedes volver a añadirlo desde 'Añadir producto'.");
+        } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
+            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
+        }
         return "redirect:/dueno/panel";
     }
 
@@ -144,6 +167,14 @@ public class DuenoController {
         // Carga las categorías
         model.addAttribute("categorias", CategoriaPlato.values());
 
+        // Formularios vacios de los pop-ups si no vienen con los datos y errores de un envio
+        if(!model.containsAttribute("nuevoPlato")){
+            model.addAttribute("nuevoPlato", new PlatoCreacionDTO());
+        }
+        if(!model.containsAttribute("platoEditado")){
+            model.addAttribute("platoEditado", new PlatoModificacionDTO());
+        }
+        
         // Carga los platos retirados de la carta ordenados
         model.addAttribute("platosRetirados", platoService.listarPlatosRetiradosDeLaCarta().stream()
         .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre)).toList());

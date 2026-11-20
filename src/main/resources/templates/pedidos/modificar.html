@@ -1,9 +1,164 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="es">
 <head>
-    <meta charset="UTF-8"><title>Title</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Modificar pedido - Sabor del Himalaya</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
 </head>
-<body>
+<body class="bg-light">
+
+<!-- Layout -->
+<div th:replace="~{layout :: header}"></div>
+
+<!-- P11 (US-09): Modificar un pedido ya confirmado durante los 10 minutos siguientes -->
+<main class="container my-4 mt-4">
+
+    <!-- Mensajes de error -->
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+
+    <div class="row g-4">
+
+        <!-- Lista editable de productos del pedido -->
+        <section class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h2 class="h4 mb-0" th:text="'Modificar pedido #' + ${pedido.idPedido}">Modificar pedido #0</h2>
+
+                        <!-- Tiempo que queda para poder modificar -->
+                        <span class="badge text-bg-warning fs-6" id="tiempo-restante"
+                              th:attr="data-segundos=${segundosRestantes}">Quedan 10:00 min</span>
+                    </div>
+                    <p class="text-muted small mt-2">Cambia la cantidad de los productos. Pon 0 para quitar un producto del pedido.</p>
+
+                    <form th:action="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}" method="post" id="form-modificar">
+
+                        <!-- Una fila por línea del pedido -->
+                        <div class="d-flex align-items-center gap-2 border-bottom py-2"
+                             th:each="linea : ${resumen.lineas}">
+
+                            <!-- Nombre y detalle del producto -->
+                            <div class="flex-grow-1">
+                                <span th:text="${linea.nombre}">Nombre del producto</span>
+                                <div class="small text-muted" th:if="${linea.detalle}" th:text="${linea.detalle}"></div>
+                                <div class="small text-muted"
+                                     th:text="${#numbers.formatDecimal(linea.precioUnitario, 1, 'POINT', 2, 'COMMA')} + ' € / unidad'">0,00 € / unidad</div>
+                            </div>
+
+                            <!-- Cantidad -->
+                            <input type="number" class="form-control form-control-sm cantidad" style="width: 5rem"
+                                   min="0" th:max="${maxCantidad}" required
+                                   th:aria-label="'Cantidad de ' + ${linea.nombre}"
+                                   th:name="${linea.menu} ? 'cantidadesMenu' : 'cantidadesPlato'"
+                                   th:value="${linea.cantidad}"
+                                   th:attr="data-precio=${linea.precioUnitario}">
+
+                            <!-- Subtotal de la línea (se actualiza al cambiar la cantidad) -->
+                            <span class="text-end subtotal" style="width: 5.5rem"
+                                  th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex gap-2 mt-4">
+                            <a class="btn btn-secondary flex-fill" th:href="@{/pedidos/mis-pedidos}">Cancelar</a>
+                            <button type="submit" class="btn btn-success flex-fill" id="btn-guardar">Guardar cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nuevo importe -->
+        <aside class="col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h4">Nuevo importe</h2>
+
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Importe anterior</span>
+                        <span id="importe-anterior" th:attr="data-importe=${pedido.importeTotal}"
+                              th:text="${#numbers.formatDecimal(pedido.importeTotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Diferencia</span>
+                        <span id="diferencia">0,00 €</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Total</span>
+                        <span class="fs-4 text-success" id="total"
+                              th:text="${#numbers.formatDecimal(resumen.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+                    </div>
+
+                    <div class="alert alert-warning small mt-3 mb-0" id="aviso-plazo">
+                        Pasados <strong th:text="${minutosModificacion}">10</strong> minutos
+                        desde la realización del pedido ya no se podrá modificar.
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+</main>
+
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Cálculo del nuevo importe y cuenta atrás del plazo (el servidor vuelve a comprobar ambos al guardar) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        function euros(valor) {
+            return valor.toFixed(2).replace('.', ',') + ' €';
+        }
+
+        // Recalcula subtotales, diferencia y total al cambiar cualquier cantidad
+        var anterior = parseFloat(document.getElementById('importe-anterior').dataset.importe);
+        var inputs = document.querySelectorAll('.cantidad');
+
+        function recalcular() {
+            var total = 0;
+            inputs.forEach(function (input) {
+                var cantidad = Math.max(0, parseInt(input.value, 10) || 0);
+                var subtotal = cantidad * parseFloat(input.dataset.precio);
+                input.parentElement.querySelector('.subtotal').textContent = euros(subtotal);
+                total += subtotal;
+            });
+            var diferencia = total - anterior;
+            document.getElementById('total').textContent = euros(total);
+            document.getElementById('diferencia').textContent = (diferencia > 0 ? '+' : '') + euros(diferencia);
+        }
+
+        inputs.forEach(function (input) {
+            input.addEventListener('input', recalcular);
+        });
+        recalcular();
+
+        // Cuenta atrás: al terminar el plazo se desactiva el botón de guardar
+        var badge = document.getElementById('tiempo-restante');
+        var segundos = parseInt(badge.dataset.segundos, 10) || 0;
+
+        function actualizarTiempo() {
+            if (segundos <= 0) {
+                badge.textContent = 'Plazo terminado';
+                badge.classList.replace('text-bg-warning', 'text-bg-danger');
+                document.getElementById('btn-guardar').disabled = true;
+                document.getElementById('aviso-plazo').classList.replace('alert-warning', 'alert-danger');
+                return;
+            }
+            var min = Math.floor(segundos / 60);
+            var seg = segundos % 60;
+            badge.textContent = 'Quedan ' + min + ':' + (seg < 10 ? '0' : '') + seg + ' min';
+            segundos--;
+            setTimeout(actualizarTiempo, 1000);
+        }
+
+        actualizarTiempo();
+    });
+</script>
 
 </body>
 </html>

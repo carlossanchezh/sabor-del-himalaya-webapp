@@ -89,6 +89,9 @@
 
             </div>
 
+            <!-- Mensaje de error (p. ej. el plazo para modificar un pedido ha terminado) -->
+            <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+
             <!-- Estado vacío: El usuario no ha realizado pedidos todavía -->
             <div class="text-center text-muted py-5" th:if="${#lists.isEmpty(pedidos)}">
                 <p>Todavía no has hecho ningún pedido.</p>
@@ -105,6 +108,14 @@
                         <div class="small text-muted" th:text="${pedido.direccionEntrega}">C/ ejemplo s/n</div>
                         <div class="fs-5 text-success fw-bold"
                              th:text="${#numbers.formatDecimal(pedido.importeTotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</div>
+
+                        <!-- US-09: botón Modificar solo durante los 10 minutos siguientes a la realización del pedido -->
+                        <div class="mt-2 plazo-modificacion" th:if="${modificables.containsKey(pedido.idPedido)}"
+                             th:attr="data-segundos=${modificables[pedido.idPedido]}">
+                            <div class="small text-muted">Tiempo para cambios: <span class="fw-bold tiempo">10:00</span> min</div>
+                            <a class="btn btn-warning btn-sm mt-1"
+                               th:href="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}">Modificar</a>
+                        </div>
                     </div>
 
                     <!-- Estado actual y barra de progreso -->
@@ -165,6 +176,30 @@
 
 <!-- Bootstrap JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- US-09: cuenta atrás del plazo de modificación; al terminar se oculta el botón (el servidor también lo comprueba) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.plazo-modificacion').forEach(function (bloque) {
+            var segundos = parseInt(bloque.dataset.segundos, 10) || 0;
+            var tiempo = bloque.querySelector('.tiempo');
+
+            function actualizar() {
+                if (segundos <= 0) {
+                    bloque.remove();
+                    return;
+                }
+                var min = Math.floor(segundos / 60);
+                var seg = segundos % 60;
+                tiempo.textContent = min + ':' + (seg < 10 ? '0' : '') + seg;
+                segundos--;
+                setTimeout(actualizar, 1000);
+            }
+
+            actualizar();
+        });
+    });
+</script>
 
 </body>
 </html>

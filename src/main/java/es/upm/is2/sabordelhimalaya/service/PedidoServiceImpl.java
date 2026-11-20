@@ -14,7 +14,9 @@ import es.upm.is2.sabordelhimalaya.model.Usuario;
 import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoMenuDiarioDTO;
 import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoPlatoDTO;
 import es.upm.is2.sabordelhimalaya.dto.response.ResumenPedidoDTO;
+import es.upm.is2.sabordelhimalaya.dto.session.PedidoTemporalDTO;
 
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 
 import es.upm.is2.sabordelhimalaya.repository.*;
@@ -179,9 +181,93 @@ public class PedidoServiceImpl implements PedidoService {
     }
 
     @Override
+    @Transactional
     public Pedido modificarPedido(Long idPedido, List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu) {
-        // TODO (US-09): Validar que no hayan pasado 10 min. Borrar líneas antiguas, crear nuevas, recalcular total.
-        throw new UnsupportedOperationException("TODO US-09");
+
+        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        Pedido pedido = buscarPorId(idPedido);
+
+        // CA9.3: pasados los 10 minutos (o si está cancelado) no se puede modificar
+        if (!sePuedeModificar(pedido)) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+        }
+
+        // Validación inicial de las listas
+        List<LineaPedidoPlatoDTO> platos = (lineasPlato != null) ? lineasPlato : List.of();
+        List<LineaPedidoMenuDiarioDTO> menus = (lineasMenu != null) ? lineasMenu : List.of();
+
+        // Un pedido modificado no puede quedarse vacío
+        if (platos.isEmpty() && menus.isEmpty()) {
+            throw new IllegalArgumentException("El pedido no puede quedarse vacío. Si ya no lo quieres, elimínalo.");
+        }
+
+        // Se validan y construyen las nuevas líneas, recalculando el total
+        BigDecimal total = BigDecimal.ZERO;
+        List<LineaPedidoPlato> nuevasLineasPlato = new ArrayList<>();
+        for (LineaPedidoPlatoDTO dto : platos) {
+            LineaPedidoPlato linea = construirLineaPlato(dto);
+            linea.setPedido(pedido);
+            nuevasLineasPlato.add(linea);
+            total = total.add(subtotal(linea.getPrecioUnitario(), linea.getCantidad()));
+        }
+        List<LineaPedidoMenuDiario> nuevasLineasMenu = new ArrayList<>();
+        for (LineaPedidoMenuDiarioDTO dto : menus) {
+            LineaPedidoMenuDiario linea = construirLineaMenu(dto);
+            linea.setPedido(pedido);
+            nuevasLineasMenu.add(linea);
+            total = total.add(subtotal(linea.getPrecioUnitario(), linea.getCantidad()));
+        }
+
+        // Se borran las líneas antiguas y se guardan las nuevas
+        lineaPedidoPlatoRepository.deleteAll(lineaPedidoPlatoRepository.findByPedidoIdPedido(idPedido));
+        lineaPedidoMenuDiarioRepository.deleteAll(lineaPedidoMenuDiarioRepository.findByPedidoIdPedido(idPedido));
+        lineaPedidoPlatoRepository.saveAll(nuevasLineasPlato);
+        lineaPedidoMenuDiarioRepository.saveAll(nuevasLineasMenu);
+
+        // CA9.2: se actualiza el importe del pedido (la fecha no cambia: el plazo cuenta desde su realización)
+        pedido.setImporteTotal(total.setScale(2, RoundingMode.HALF_UP));
+
+        return pedidoRepository.save(pedido);
+    }
+
+    @Override
+    public boolean sePuedeModificar(Pedido pedido) {
+
+        return pedido.getEstado() != EstadoPedido.CANCELADO
+                && pedido.getFechaHora() != null
+                && LocalDateTime.now().isBefore(pedido.getFechaHora().plusMinutes(MINUTOS_MODIFICACION));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PedidoTemporalDTO obtenerLineasDePedido(Long idPedido) {
+
+        // Comprueba que el pedido existe
+        buscarPorId(idPedido);
+
+        PedidoTemporalDTO lineas = new PedidoTemporalDTO();
+
+        // Líneas de platos
+        for (LineaPedidoPlato linea : lineaPedidoPlatoRepository.findByPedidoIdPedido(idPedido)) {
+            LineaPedidoPlatoDTO dto = new LineaPedidoPlatoDTO();
+            dto.setIdPlato(linea.getPlato().getIdPlato());
+            dto.setCantidad(linea.getCantidad());
+            lineas.getLineasPlato().add(dto);
+        }
+
+        // Líneas de menús del día
+        for (LineaPedidoMenuDiario linea : lineaPedidoMenuDiarioRepository.findByPedidoIdPedido(idPedido)) {
+            LineaPedidoMenuDiarioDTO dto = new LineaPedidoMenuDiarioDTO();
+            dto.setIdMenuDiario(linea.getMenuDiario().getIdMenuDiario());
+            dto.setIdEntrante(linea.getEntrante().getIdPlato());
+            dto.setIdPrincipal(linea.getPrincipal().getIdPlato());
+            dto.setIdPostre(linea.getPostre().getIdPlato());
+            dto.setIdBebida(linea.getBebida().getIdPlato());
+            dto.setCantidad(linea.getCantidad());
+            lineas.getLineasMenu().add(dto);
+        }
+
+        return lineas;
     }
 
     @Override

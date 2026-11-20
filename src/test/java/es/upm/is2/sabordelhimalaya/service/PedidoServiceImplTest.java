@@ -6,6 +6,8 @@ import es.upm.is2.sabordelhimalaya.dto.response.ResumenPedidoDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaMenu;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.enums.EstadoPedido;
+import es.upm.is2.sabordelhimalaya.dto.session.PedidoTemporalDTO;
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.LineaPedidoMenuDiario;
 import es.upm.is2.sabordelhimalaya.model.LineaPedidoPlato;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +47,7 @@ import static org.mockito.Mockito.*;
  - US-06 (Crear pedido)
  - US-07 (Revisar y confirmar pedido)
  - US-08 (Consultar el estado del pedido)
+ - US-09 (Modificar un pedido)
  */
 
 @ExtendWith(MockitoExtension.class)
@@ -502,5 +506,150 @@ public class PedidoServiceImplTest {
         assertEquals(EstadoPedido.EN_REPARTO, resultado.get(2).getEstado());
         assertEquals(EstadoPedido.ENTREGADO, resultado.get(3).getEstado());
         assertEquals(EstadoPedido.CANCELADO, resultado.get(4).getEstado());
+    }
+
+    // ----------------------------------------------------------------
+    // US-09: Modificar un pedido
+    // ----------------------------------------------------------------
+
+    private Pedido pedidoHaceMinutos(long minutos, EstadoPedido estado) {
+
+        Pedido p = pedido(1L, estado, "10.00");
+        p.setUsuario(usuario);
+        p.setFechaHora(LocalDateTime.now().minusMinutes(minutos));
+        return p;
+    }
+
+    @Test
+    @DisplayName("PU-09-01: modificarPedido dentro de los 10 minutos recalcula el importe con las nuevas cantidades")
+    void modificarPedido_dentroDelPlazo_recalculaImporte() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        lineaPlatoDTO.setCantidad(2);
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of());
+
+        assertEquals(new BigDecimal("20.00"), resultado.getImporteTotal());
+        assertEquals(EstadoPedido.RECIBIDO, resultado.getEstado());
+    }
+
+    @Test
+    @DisplayName("PU-09-02: modificarPedido borra las líneas antiguas y guarda las nuevas")
+    void modificarPedido_dentroDelPlazo_sustituyeLineas() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        List<LineaPedidoPlato> antiguas = List.of(lineaPedidoPlato(entrante, 1, "10.00"));
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+        when(lineaPedidoPlatoRepository.findByPedidoIdPedido(1L)).thenReturn(antiguas);
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of());
+
+        verify(lineaPedidoPlatoRepository).deleteAll(antiguas);
+        verify(lineaPedidoPlatoRepository).saveAll(argThat(lineas -> lineas.iterator().next().getPedido() == pedido));
+    }
+
+    @Test
+    @DisplayName("PU-09-03: modificarPedido con un menú del día recalcula el importe (2 x 15 €)")
+    void modificarPedido_conMenu_recalculaImporte() {
+
+        prepararMenu();
+        Pedido pedido = pedidoHaceMinutos(1, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        lineaMenuDTO.setCantidad(2);
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(), List.of(lineaMenuDTO));
+
+        assertEquals(new BigDecimal("30.00"), resultado.getImporteTotal());
+    }
+
+    @Test
+    @DisplayName("PU-09-04: modificarPedido pasados los 10 minutos lanza OperacionNoPermitida y no guarda nada")
+    void modificarPedido_fueraDelPlazo_lanzaOperacionNoPermitida() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(11, EstadoPedido.RECIBIDO)));
+
+        assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+
+        verify(pedidoRepository, never()).save(any());
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-05: modificarPedido de un pedido cancelado lanza OperacionNoPermitida")
+    void modificarPedido_cancelado_lanzaOperacionNoPermitida() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.CANCELADO)));
+
+        assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+    }
+
+    @Test
+    @DisplayName("PU-09-06: modificarPedido dejando el pedido vacío lanza IllegalArgumentException")
+    void modificarPedido_vacio_lanzaError() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(), List.of()));
+
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-07: modificarPedido con un plato retirado lanza IllegalArgumentException sin borrar las líneas")
+    void modificarPedido_platoRetirado_lanzaErrorSinBorrar() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+        when(platoRepository.findById(20L)).thenReturn(Optional.of(platoRetirado));
+
+        lineaPlatoDTO.setIdPlato(20L);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-08: modificarPedido con pedido inexistente lanza RecursoNoEncontrado")
+    void modificarPedido_noExiste_lanzaRecursoNoEncontrado() {
+
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> pedidoService.modificarPedido(99L, List.of(lineaPlatoDTO), List.of()));
+    }
+
+    @Test
+    @DisplayName("PU-09-09: sePuedeModificar es true a los 9 minutos y false a los 11")
+    void sePuedeModificar_limiteDeDiezMinutos() {
+
+        assertTrue(pedidoService.sePuedeModificar(pedidoHaceMinutos(9, EstadoPedido.RECIBIDO)));
+        assertFalse(pedidoService.sePuedeModificar(pedidoHaceMinutos(11, EstadoPedido.RECIBIDO)));
+    }
+
+    @Test
+    @DisplayName("PU-09-10: obtenerLineasDePedido convierte las líneas del pedido a DTO")
+    void obtenerLineasDePedido_convierteLineas() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+        when(lineaPedidoPlatoRepository.findByPedidoIdPedido(1L)).thenReturn(List.of(lineaPedidoPlato(entrante, 3, "10.00")));
+        when(lineaPedidoMenuDiarioRepository.findByPedidoIdPedido(1L)).thenReturn(List.of(lineaPedidoMenu(2, "15.00")));
+
+        PedidoTemporalDTO lineas = pedidoService.obtenerLineasDePedido(1L);
+
+        assertEquals(10L, lineas.getLineasPlato().get(0).getIdPlato());
+        assertEquals(3, lineas.getLineasPlato().get(0).getCantidad());
+        assertEquals(1L, lineas.getLineasMenu().get(0).getIdMenuDiario());
+        assertEquals(13L, lineas.getLineasMenu().get(0).getIdBebida());
+        assertEquals(2, lineas.getLineasMenu().get(0).getCantidad());
     }
 }

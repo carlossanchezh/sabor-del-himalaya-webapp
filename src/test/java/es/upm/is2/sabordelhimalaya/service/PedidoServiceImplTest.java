@@ -497,10 +497,10 @@ public class PedidoServiceImplTest {
         List<Pedido> resultado = pedidoService.listarPedidosDeUsuario(1L);
 
         assertEquals(5, resultado.size());
-        assertEquals(EstadoPedido.RECIBIDO,       resultado.get(0).getEstado());
+        assertEquals(EstadoPedido.RECIBIDO, resultado.get(0).getEstado());
         assertEquals(EstadoPedido.EN_PREPARACION, resultado.get(1).getEstado());
-        assertEquals(EstadoPedido.EN_REPARTO,     resultado.get(2).getEstado());
-        assertEquals(EstadoPedido.ENTREGADO,      resultado.get(3).getEstado());
-        assertEquals(EstadoPedido.CANCELADO,      resultado.get(4).getEstado());
+        assertEquals(EstadoPedido.EN_REPARTO, resultado.get(2).getEstado());
+        assertEquals(EstadoPedido.ENTREGADO, resultado.get(3).getEstado());
+        assertEquals(EstadoPedido.CANCELADO, resultado.get(4).getEstado());
     }
 }

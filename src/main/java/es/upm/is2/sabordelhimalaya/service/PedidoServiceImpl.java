@@ -191,15 +191,33 @@ public class PedidoServiceImpl implements PedidoService {
     }
 
     @Override
+    @Transactional
     public Pedido cambiarEstado(Long idPedido, EstadoPedido nuevoEstado) {
-        // TODO (US-11): Buscar pedido, actualizar estado y guardar.
-        throw new UnsupportedOperationException("TODO US-11");
+
+        // El nuevo estado es obligatorio
+        if (nuevoEstado == null) {
+            throw new IllegalArgumentException("Se debe indicar el nuevo estado del pedido.");
+        }
+
+        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        Pedido pedido = buscarPorId(idPedido);
+
+        // Se actualiza y se almacena el nuevo estado
+        pedido.setEstado(nuevoEstado);
+
+        return pedidoRepository.save(pedido);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Pedido> listarPedidosDelDia(LocalDate fecha) {
-        // TODO (US-11): return pedidoRepository.findByFechaHoraBetween(fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
-        throw new UnsupportedOperationException("TODO US-11");
+
+        if (fecha == null) {
+            throw new IllegalArgumentException("Se debe indicar la fecha de la que listar los pedidos.");
+        }
+
+        // Pedidos cuyo fechaHora está dentro del día indicado
+        return pedidoRepository.findByFechaHoraBetween(fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
     }
 
     @Override

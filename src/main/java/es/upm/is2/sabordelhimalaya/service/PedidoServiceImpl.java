@@ -271,9 +271,26 @@ public class PedidoServiceImpl implements PedidoService {
     }
 
     @Override
+    @Transactional
     public void cancelarPedido(Long idPedido) {
-        // TODO (US-10): Validar que no hayan pasado 10 min. Cambiar estado a CANCELADO.
-        throw new UnsupportedOperationException("TODO US-10");
+
+        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        Pedido pedido = buscarPorId(idPedido);
+
+        // Un pedido ya cancelado no se puede volver a eliminar
+        // (este control va antes que el del plazo, porque sePuedeModificar también devuelve false si está cancelado)
+        if (pedido.getEstado() == EstadoPedido.CANCELADO) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya está cancelado.");
+        }
+
+        // CA10.3: pasados los 10 minutos no se puede eliminar
+        if (!sePuedeModificar(pedido)) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede eliminar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+        }
+
+        // CA10.1 y CA10.2: el pedido pasa a CANCELADO y deja de aparecer como pedido activo
+        pedido.setEstado(EstadoPedido.CANCELADO);
+        pedidoRepository.save(pedido);
     }
 
     @Override

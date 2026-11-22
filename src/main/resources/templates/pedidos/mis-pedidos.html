@@ -109,12 +109,36 @@
                         <div class="fs-5 text-success fw-bold"
                              th:text="${#numbers.formatDecimal(pedido.importeTotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</div>
 
-                        <!-- US-09: botón Modificar solo durante los 10 minutos siguientes a la realización del pedido -->
+                        <!-- US-09 / US-10: botones Modificar y Eliminar solo durante los 10 minutos siguientes a la realización del pedido -->
                         <div class="mt-2 plazo-modificacion" th:if="${modificables.containsKey(pedido.idPedido)}"
                              th:attr="data-segundos=${modificables[pedido.idPedido]}">
                             <div class="small text-muted">Tiempo para cambios: <span class="fw-bold tiempo">10:00</span> min</div>
-                            <a class="btn btn-warning btn-sm mt-1"
-                               th:href="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}">Modificar</a>
+                            <div class="d-flex gap-2 mt-1">
+                                <a class="btn btn-warning btn-sm"
+                                   th:href="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}">Modificar</a>
+                                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal"
+                                        th:attr="data-bs-target=${'#modalEliminar-' + pedido.idPedido}">Eliminar</button>
+                            </div>
+
+                            <!-- P12: ventana de confirmación para eliminar el pedido (US-10) -->
+                            <div class="modal fade" tabindex="-1" aria-hidden="true"
+                                 th:id="'modalEliminar-' + ${pedido.idPedido}">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content text-center">
+                                        <div class="modal-body p-4">
+                                            <div class="fs-1 text-danger fw-bold">!</div>
+                                            <h2 class="h5" th:text="'¿Eliminar el pedido #' + ${pedido.idPedido} + '?'">¿Eliminar el pedido?</h2>
+                                            <p class="small text-muted mb-2">El pedido se cancelará y dejará de aparecer como pedido activo. Esta acción no se puede deshacer.</p>
+                                            <p class="small fw-bold text-warning-emphasis mb-3">Tiempo restante para eliminar: <span class="tiempo">10:00</span></p>
+                                            <form th:action="@{/pedidos/{id}/cancelar(id=${pedido.idPedido})}" method="post"
+                                                  class="d-flex gap-2 justify-content-center">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Eliminar pedido</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -177,21 +201,31 @@
 <!-- Bootstrap JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- US-09: cuenta atrás del plazo de modificación; al terminar se oculta el botón (el servidor también lo comprueba) -->
+<!-- US-09 / US-10: cuenta atrás del plazo (Modificar / Eliminar); al terminar se oculta el bloque (el servidor también lo comprueba) -->
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.plazo-modificacion').forEach(function (bloque) {
             var segundos = parseInt(bloque.dataset.segundos, 10) || 0;
-            var tiempo = bloque.querySelector('.tiempo');
+            var tiempos = bloque.querySelectorAll('.tiempo');   // contador del bloque y del modal P12
 
             function actualizar() {
                 if (segundos <= 0) {
-                    bloque.remove();
+                    // Si el modal P12 sigue abierto, se cierra antes de quitar el bloque
+                    var modalAbierto = bloque.querySelector('.modal.show');
+                    if (modalAbierto) {
+                        modalAbierto.addEventListener('hidden.bs.modal', function () {
+                            bloque.remove();
+                        });
+                        bootstrap.Modal.getInstance(modalAbierto).hide();
+                    } else {
+                        bloque.remove();
+                    }
                     return;
                 }
                 var min = Math.floor(segundos / 60);
                 var seg = segundos % 60;
-                tiempo.textContent = min + ':' + (seg < 10 ? '0' : '') + seg;
+                var texto = min + ':' + (seg < 10 ? '0' : '') + seg;
+                tiempos.forEach(function (t) { t.textContent = texto; });
                 segundos--;
                 setTimeout(actualizar, 1000);
             }

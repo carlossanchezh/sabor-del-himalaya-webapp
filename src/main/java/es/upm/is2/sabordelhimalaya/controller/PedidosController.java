@@ -461,13 +461,21 @@ public class PedidosController {
         return Math.max(0, Duration.between(LocalDateTime.now(), limite).getSeconds());
     }
 
-
     @PostMapping("/{id}/cancelar")
-    public String cancelarPedido(@PathVariable Long id) {
-        // TODO (US-10): Llamar a PedidoService.cancelarPedido(id).
-        // Cancelar el pedido
-        // TODO (P12): Crear HTML
-        // P12: Pop up dentro de pantalla 10 para confirmar si se desea eliminar el pedido
+    public String cancelarPedido(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+
+        // Solo el dueño del pedido puede eliminarlo (403 si es de otro usuario, 404 si no existe)
+        pedidoDelUsuario(id, authentication);
+
+        try {
+            pedidoService.cancelarPedido(id);
+            log.info("Pedido #{} eliminado por el usuario {}", id, authentication.getName());
+            redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " eliminado correctamente.");
+        } catch (OperacionNoPermitidaException e) {
+            // Plazo de 10 minutos agotado o pedido ya cancelado
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
         return "redirect:/pedidos/mis-pedidos";
     }
 }

@@ -585,7 +585,7 @@ class PlatoServiceImplTest {
         PlatoCreacionDTO dto = dto("  Entrante del Chef ", "Otra descripción", null, CategoriaPlato.ENTRANTE);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
-        assertTrue(ex.getMessage().contains("Ya tienes"));
+        assertTrue(ex.getMessage().contains("Ya existe"));
         verify(platoRepository, never()).save(any());
     }
 

@@ -33,7 +33,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // Error 500
     public String handleGenericException(Exception ex, Model model) {
-        log.error("Error inesperado no controlado", ex);
         model.addAttribute("mensajeError", "Ha ocurrido un error inesperado. Por favor, inténtalo más tarde.");
         return "error/500"; // Devuelve la plantilla templates/error/500.html
     }

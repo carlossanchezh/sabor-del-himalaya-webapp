@@ -54,6 +54,9 @@ public class PedidosController {
     // Máximo de unidades por línea de pedido
     private static final int MAX_CANTIDAD = 99;
 
+    // Minutos tras la realización del pedido durante los que se puede modificar
+    private static final int MINUTOS_MODIFICACION = 10;
+
     private final PedidoService pedidoService;
     private final UsuarioService usuarioService;
 
@@ -320,38 +323,41 @@ public class PedidosController {
 
         model.addAttribute("resumenesPedidos", resumenesPedidos);
 
-        // US-09: pedidos que todavía se pueden modificar y segundos que les quedan
+        // Pedidos que todavía se pueden modificar y segundos que les quedan
         Map<Long, Long> modificables = new HashMap<>();
         for (Pedido pedido : pedidos) {
             if (pedidoService.sePuedeModificar(pedido)) {
                 modificables.put(pedido.getIdPedido(), segundosRestantes(pedido));
             }
         }
+
         model.addAttribute("modificables", modificables);
 
         return "pedidos/mis-pedidos";
     }
 
-
-    // P11: Formulario para modificar un pedido ya confirmado (solo dentro de los 10 minutos)
     @GetMapping("/{id}/modificar")
     public String mostrarEditarPedido(@PathVariable Long id, Authentication authentication, Model model, RedirectAttributes redirectAttributes) {
 
         // Se obtiene el pedido y se comprueba que es del usuario logueado
         Pedido pedido = pedidoDelUsuario(id, authentication);
 
-        // CA9.3: pasados los 10 minutos no se puede modificar
+        // Pasados los 10 minutos no se puede modificar
         if (!pedidoService.sePuedeModificar(pedido)) {
-            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + PedidoService.MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
             return "redirect:/pedidos/mis-pedidos";
         }
 
         // Resumen de las líneas actuales del pedido (con el mismo orden que el formulario)
         PedidoTemporalDTO lineas = pedidoService.obtenerLineasDePedido(id);
         ResumenPedidoDTO resumen;
+
         try {
+
             resumen = pedidoService.resumirPedidoTemporal(lineas.getLineasPlato(), lineas.getLineasMenu());
+
         } catch (IllegalArgumentException e) {
+
             // Algún producto del pedido ya no está disponible (p. ej. el dueño lo ha retirado de la carta)
             redirectAttributes.addFlashAttribute("error", "No se puede modificar el pedido #" + id + ": " + e.getMessage());
             return "redirect:/pedidos/mis-pedidos";
@@ -361,21 +367,20 @@ public class PedidosController {
         model.addAttribute("resumen", resumen);
         model.addAttribute("segundosRestantes", segundosRestantes(pedido));
         model.addAttribute("maxCantidad", MAX_CANTIDAD);
-        model.addAttribute("minutosModificacion", PedidoService.MINUTOS_MODIFICACION);
+        model.addAttribute("minutosModificacion", MINUTOS_MODIFICACION);
 
         return "pedidos/modificar";
     }
 
-    // Guarda los cambios de un pedido ya confirmado
     @PostMapping("/{id}/modificar")
     public String guardarEdicionPedido(@PathVariable Long id, @RequestParam(required = false) List<Integer> cantidadesPlato, @RequestParam(required = false) List<Integer> cantidadesMenu, Authentication authentication, RedirectAttributes redirectAttributes) {
 
         // Se obtiene el pedido y se comprueba que es del usuario logueado
         Pedido pedido = pedidoDelUsuario(id, authentication);
 
-        // CA9.3: pasados los 10 minutos no se puede modificar
+        // Pasados los 10 minutos no se puede modificar
         if (!pedidoService.sePuedeModificar(pedido)) {
-            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + PedidoService.MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
             return "redirect:/pedidos/mis-pedidos";
         }
 
@@ -406,6 +411,7 @@ public class PedidosController {
         for (int i = 0; i < numMenus; i++) {
             menus.get(i).setCantidad(cantidadesMenu.get(i));
         }
+
         platos.removeIf(linea -> linea.getCantidad() < 1);
         menus.removeIf(linea -> linea.getCantidad() < 1);
 
@@ -432,11 +438,38 @@ public class PedidosController {
 
         log.info("Pedido #{} modificado por usuario='{}' ({} € -> {} €)", id, authentication.getName(), importeAnterior, pedidoModificado.getImporteTotal());
 
-        // CA9.2: se informa del nuevo importe; "Mis pedidos" muestra los nuevos productos
+        // Se informa del nuevo importe; "Mis pedidos" muestra los nuevos productos
         redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " modificado correctamente. Nuevo importe: " + pedidoModificado.getImporteTotal().toPlainString().replace('.', ',') + " €");
 
         return "redirect:/pedidos/mis-pedidos";
     }
+
+    @PostMapping("/{id}/cancelar")
+    public String cancelarPedido(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+
+        // Solo el dueño del pedido puede eliminarlo
+        pedidoDelUsuario(id, authentication);
+
+        try {
+
+            pedidoService.cancelarPedido(id);
+
+            log.info("Pedido #{} cancelado por el usuario '{}'", id, authentication.getName());
+
+            redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " cancelado correctamente.");
+
+        } catch (OperacionNoPermitidaException e) {
+
+            // Plazo de 10 minutos agotado o pedido ya cancelado
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
+        return "redirect:/pedidos/mis-pedidos";
+    }
+
+    // ----------------------------------------------------------------
+    // Métodos auxiliares
+    // ----------------------------------------------------------------
 
     // Devuelve el pedido si pertenece al usuario logueado (403 si es de otro usuario, 404 si no existe)
     private Pedido pedidoDelUsuario(Long idPedido, Authentication authentication) {
@@ -457,25 +490,9 @@ public class PedidosController {
         if (!pedidoService.sePuedeModificar(pedido)) {
             return 0;
         }
-        LocalDateTime limite = pedido.getFechaHora().plusMinutes(PedidoService.MINUTOS_MODIFICACION);
+
+        LocalDateTime limite = pedido.getFechaHora().plusMinutes(MINUTOS_MODIFICACION);
+
         return Math.max(0, Duration.between(LocalDateTime.now(), limite).getSeconds());
-    }
-
-    @PostMapping("/{id}/cancelar")
-    public String cancelarPedido(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
-
-        // Solo el dueño del pedido puede eliminarlo (403 si es de otro usuario, 404 si no existe)
-        pedidoDelUsuario(id, authentication);
-
-        try {
-            pedidoService.cancelarPedido(id);
-            log.info("Pedido #{} eliminado por el usuario {}", id, authentication.getName());
-            redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " eliminado correctamente.");
-        } catch (OperacionNoPermitidaException e) {
-            // Plazo de 10 minutos agotado o pedido ya cancelado
-            redirectAttributes.addFlashAttribute("error", e.getMessage());
-        }
-
-        return "redirect:/pedidos/mis-pedidos";
     }
 }

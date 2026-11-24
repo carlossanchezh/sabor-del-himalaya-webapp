@@ -26,9 +26,6 @@ public interface PedidoService {
     // US-08: Usuario ver el estado de sus pedidos
     List<Pedido> listarPedidosDeUsuario(Long idUsuario);
 
-    // US-09 / US-10: Minutos tras la realización del pedido durante los que se puede modificar
-    int MINUTOS_MODIFICACION = 10;
-
     // US-09: Usuario modificar pedido
     Pedido modificarPedido(Long idPedido, List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu);
 
@@ -51,5 +48,4 @@ public interface PedidoService {
     BigDecimal calcularFacturacion(LocalDate fecha);
     
     Pedido buscarPorId(Long id);
-    List<Pedido> listarTodosPedidos();
 }

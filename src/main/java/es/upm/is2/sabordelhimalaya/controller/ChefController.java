@@ -10,6 +10,8 @@ import es.upm.is2.sabordelhimalaya.service.PlatoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -51,8 +53,18 @@ public class ChefController {
         model.addAttribute("fechaHoy", formatearFecha(hoy));
         model.addAttribute("menuConfigurado", menuDiarioService.consultarMenuDeFecha(hoy).isPresent());
 
-        // Platos fuera de carta creados por el chef (US-14)
-        model.addAttribute("platosChef", ordenarPlatos(platoService.listarPlatosDelChef()));
+        // Platos fuera de carta creados por el chef ordenados por categoría y alfabéticamente
+        model.addAttribute("platosChef", platoService.listarPlatosDelChef().stream()
+                .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre))
+                .toList());
+
+        // Formulario del modal de crear plato
+        if (!model.containsAttribute("plato")) {
+            model.addAttribute("plato", new PlatoCreacionDTO());
+        }
+
+        cargarCategoriasPlatoChef(model);
+
         return "chef/carta";
     }
 
@@ -81,7 +93,7 @@ public class ChefController {
     }
 
     @PostMapping("/menu")
-    public String guardarMenu(@Valid @ModelAttribute("menu") MenuDiarioDTO menu, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+    public String guardarMenu(@Valid @ModelAttribute("menu") MenuDiarioDTO menu, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes, Authentication authentication) {
 
         // Fecha del día de hoy
         LocalDate hoy = LocalDate.now();
@@ -100,7 +112,7 @@ public class ChefController {
 
             // Configuración del menú del día
             menuDiarioService.configurarMenu(menu);
-            log.info("Menú diario configurado para {} ", hoy);
+            log.info("Chef '{}' ha crado menú diario configurado para {} ",authentication.getName(), hoy);
 
         } catch (IllegalArgumentException e) {
 
@@ -116,41 +128,70 @@ public class ChefController {
         return "redirect:/chef/carta";
     }
 
-    @GetMapping("/platos/nuevo")
-    public String mostrarNuevoPlato(Model model) {
-
-        // Formulario vacío para crear un plato fuera de carta (US-14)
-        model.addAttribute("plato", new PlatoCreacionDTO());
-        cargarCategoriasPlatoChef(model);
-
-        return "chef/nuevo-plato";
-    }
-
     @PostMapping("/platos/nuevo")
-    public String guardarPlatoFueraDeCarta(@ModelAttribute("plato") PlatoCreacionDTO plato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+    public String guardarPlatoFueraDeCarta(@ModelAttribute("plato") PlatoCreacionDTO plato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes, Authentication authentication) {
 
         // Errores de binding (por ejemplo, una categoría que no existe)
         if (bindingResult.hasErrors()) {
-            model.addAttribute("error", "Los datos del formulario no son válidos. Revisa el plato.");
+
+            // Recargar los datos de la vista
+            Map<String, List<Plato>> carta = new LinkedHashMap<>();
+            carta.put("Entrantes", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.ENTRANTE)));
+            carta.put("Principales", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.PRINCIPAL)));
+            carta.put("Postres", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.POSTRE)));
+            carta.put("Bebidas", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.BEBIDA)));
+            model.addAttribute("carta", carta);
+
+            LocalDate hoy = LocalDate.now();
+            model.addAttribute("fechaHoy", formatearFecha(hoy));
+            model.addAttribute("menuConfigurado", menuDiarioService.consultarMenuDeFecha(hoy).isPresent());
+
+            model.addAttribute("platosChef", platoService.listarPlatosDelChef().stream()
+                    .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre))
+                    .toList());
+
             cargarCategoriasPlatoChef(model);
-            return "chef/nuevo-plato";
+
+            // Mensaje de error
+            model.addAttribute("error", "Los datos del formulario no son válidos. Revisa el plato.");
+            model.addAttribute("mostrarModalNuevoPlatoChef", true);
+
+            return "chef/carta";
         }
 
         try {
 
             // Guardar el plato fuera de carta (precio 0, esta_en_carta=false, es_del_chef=true)
             Plato creado = platoService.crearPlatoFueraDeCarta(plato);
-            log.info("Plato fuera de carta creado: {} ({})", creado.getNombre(), creado.getCategoria());
 
+            log.info("Chef '{}' ha creado el plato fuera de carta #{} '{}' ({})", authentication.getName(), creado.getIdPlato(), creado.getNombre(), creado.getCategoria());
             // Mensaje de éxito al crear el plato
-            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + creado.getNombre() + "' guardado. Ya puedes elegirlo al configurar el menú diario.");
+            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + creado.getNombre() + "' guardado fuera de carta. Ya puedes seleccionarlo al configurar el menú diario.");
 
         } catch (IllegalArgumentException e) {
 
-            // Errores de validación (nombre o descripción vacíos, sin categoría, bebida, nombre repetido...)
-            model.addAttribute("error", e.getMessage());
+            // Error de negocio, recargar los datos de la vista y reabrir el modal
+            Map<String, List<Plato>> carta = new LinkedHashMap<>();
+            carta.put("Entrantes", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.ENTRANTE)));
+            carta.put("Principales", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.PRINCIPAL)));
+            carta.put("Postres", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.POSTRE)));
+            carta.put("Bebidas", ordenarPlatos(platoService.listarCartaPorCategoria(CategoriaPlato.BEBIDA)));
+            model.addAttribute("carta", carta);
+
+            LocalDate hoy = LocalDate.now();
+            model.addAttribute("fechaHoy", formatearFecha(hoy));
+            model.addAttribute("menuConfigurado", menuDiarioService.consultarMenuDeFecha(hoy).isPresent());
+
+            model.addAttribute("platosChef", platoService.listarPlatosDelChef().stream()
+                    .sorted(Comparator.comparing(Plato::getCategoria).thenComparing(Plato::getNombre))
+                    .toList());
+
             cargarCategoriasPlatoChef(model);
-            return "chef/nuevo-plato";
+
+            model.addAttribute("error", e.getMessage());
+            model.addAttribute("mostrarModalNuevoPlatoChef", true);
+
+            return "chef/carta";
         }
 
         return "redirect:/chef/carta";

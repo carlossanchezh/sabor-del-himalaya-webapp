@@ -79,12 +79,25 @@ public class PlatoServiceImpl implements PlatoService {
 
         String nombre = dto.getNombre().trim();
 
-        // Validar que el chef no tiene ya un plato con ese nombre (sin distinguir mayúsculas)
-        boolean existePlato = platoRepository.findByEsDelChefTrue().stream()
-                .anyMatch(p -> p.getNombre() != null && p.getNombre().trim().equalsIgnoreCase(nombre));
+        // Validar que no hay un plato con ese nombre en carta
+        boolean existePlatoCarta = platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaTrue(nombre);
 
-        if (existePlato) {
-            throw new IllegalArgumentException("Ya tienes un plato fuera de carta llamado '" + nombre + "'.");
+        if (existePlatoCarta) {
+            throw new IllegalArgumentException("El plato '" + nombre + "' ya está en la carta.");
+        }
+
+        // Validar que no hay un plato con ese nombre retirado de carta
+        boolean existePlatoRetiradoCarta = platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaFalseAndEsDelChefFalse(nombre);
+
+        if (existePlatoRetiradoCarta) {
+            throw new IllegalArgumentException("El plato '" + nombre + "' está retirado de la carta. Solicita al dueño que lo vuelva a incluir en carta.");
+        }
+
+        // Validar que el chef no tiene ya un plato creado con ese nombre
+        boolean existePlatoFueraCarta = platoRepository.existsByNombreIgnoreCaseAndEsDelChefTrue(nombre);
+
+        if (existePlatoFueraCarta) {
+            throw new IllegalArgumentException("Ya existe un plato fuera de carta llamado '" + nombre + "'.");
         }
 
         // Crear nuevo plato
@@ -175,6 +188,7 @@ public class PlatoServiceImpl implements PlatoService {
     @Override
     @Transactional
     public Plato modificarPlato(PlatoModificacionDTO dto) {
+
         if(dto == null || dto.getIdPlato() == null){
             throw new IllegalArgumentException("Debes indicar el plato que quieres modificar.");
         }
@@ -183,6 +197,9 @@ public class PlatoServiceImpl implements PlatoService {
         }
         if(dto.getDescripcion() == null || dto.getDescripcion().isBlank()){
             throw new IllegalArgumentException("La descripcion es obligatoria.");
+        }
+        if (dto.getDescripcion().trim().length() > 255) {
+            throw new IllegalArgumentException("La descripción no puede superar 255 caracteres.");
         }
         if(dto.getPrecio() == null || dto.getPrecio().compareTo(new BigDecimal("0.01")) < 0){
             throw new IllegalArgumentException("El precio del plato debe ser de al menos 0.01.");
@@ -195,7 +212,8 @@ public class PlatoServiceImpl implements PlatoService {
         }
 
         Plato plato = buscarPorId(dto.getIdPlato());
-        //Dueño solo modifica productos de la carta (ni platos de chef ni retirados)
+
+        // Dueño solo modifica productos de la carta (ni platos de chef ni retirados)
         if(plato.getEsDelChef()){
             throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden modificar desde la carta.");
         }
@@ -219,8 +237,10 @@ public class PlatoServiceImpl implements PlatoService {
     @Override
     @Transactional 
     public void retirarPlatoDeLaCarta(Long id) {
+
         Plato plato = buscarPorId(id);
-        //Solo se retiran productos de la carta (los platos del chef nunca lo estan)
+
+        //Solo se retiran productos de la carta (los platos del chef nunca lo están)
         if(plato.getEsDelChef()){
             throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden retirar de la carta.");
         }

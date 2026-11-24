@@ -12,12 +12,14 @@ import es.upm.is2.sabordelhimalaya.repository.UsuarioRepository;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UsuarioServiceImpl implements UsuarioService {
@@ -78,6 +80,9 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuario.setEstadoActivacion(true);
             usuario.setTokenActivacion(null); // Se borra el token para que no se pueda reutilizar
             usuarioRepository.save(usuario);
+
+            log.info("Cuenta activada: login='{}'", usuario.getLogin());
+
             return true;
         }
 

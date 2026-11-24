@@ -35,6 +35,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PedidoServiceImpl implements PedidoService {
 
+    // Minutos tras la realización del pedido durante los que se puede modificar
+    private static final int MINUTOS_MODIFICACION = 10;
+
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PlatoRepository platoRepository;
@@ -187,7 +190,7 @@ public class PedidoServiceImpl implements PedidoService {
         // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
         Pedido pedido = buscarPorId(idPedido);
 
-        // CA9.3: pasados los 10 minutos (o si está cancelado) no se puede modificar
+        // Pasados los 10 minutos (o si está cancelado) no se puede modificar
         if (!sePuedeModificar(pedido)) {
             throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
         }
@@ -224,7 +227,7 @@ public class PedidoServiceImpl implements PedidoService {
         lineaPedidoPlatoRepository.saveAll(nuevasLineasPlato);
         lineaPedidoMenuDiarioRepository.saveAll(nuevasLineasMenu);
 
-        // CA9.2: se actualiza el importe del pedido (la fecha no cambia: el plazo cuenta desde su realización)
+        // Se actualiza el importe del pedido (la fecha no cambia: el plazo cuenta desde su realización)
         pedido.setImporteTotal(total.setScale(2, RoundingMode.HALF_UP));
 
         return pedidoRepository.save(pedido);
@@ -274,21 +277,20 @@ public class PedidoServiceImpl implements PedidoService {
     @Transactional
     public void cancelarPedido(Long idPedido) {
 
-        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        // Se busca el pedido
         Pedido pedido = buscarPorId(idPedido);
 
         // Un pedido ya cancelado no se puede volver a eliminar
-        // (este control va antes que el del plazo, porque sePuedeModificar también devuelve false si está cancelado)
         if (pedido.getEstado() == EstadoPedido.CANCELADO) {
             throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya está cancelado.");
         }
 
-        // CA10.3: pasados los 10 minutos no se puede eliminar
+        // Pasados los 10 minutos no se puede eliminar
         if (!sePuedeModificar(pedido)) {
             throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede eliminar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
         }
 
-        // CA10.1 y CA10.2: el pedido pasa a CANCELADO y deja de aparecer como pedido activo
+        // El pedido pasa a CANCELADO y deja de aparecer como pedido activo
         pedido.setEstado(EstadoPedido.CANCELADO);
         pedidoRepository.save(pedido);
     }
@@ -349,12 +351,6 @@ public class PedidoServiceImpl implements PedidoService {
         // Obtener un pedido por su id
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el pedido con id " + id));
-    }
-
-    @Override
-    public List<Pedido> listarTodosPedidos() {
-        // TODO: return pedidoRepository.findAll();
-        throw new UnsupportedOperationException("TODO");
     }
 
     // ----------------------------------------------------------------

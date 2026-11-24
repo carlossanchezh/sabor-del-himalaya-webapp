@@ -9,7 +9,10 @@ import es.upm.is2.sabordelhimalaya.service.PedidoService;
 import es.upm.is2.sabordelhimalaya.service.PlatoService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.ui.Model;
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Controller
 @RequestMapping("/dueno")
 @RequiredArgsConstructor 
@@ -53,7 +57,7 @@ public class DuenoController {
     }
 
     @PostMapping("/platos/nuevo")
-    public String guardarNuevoPlato(@Valid @ModelAttribute("nuevoPlato") PlatoCreacionDTO nuevoPlato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+    public String guardarNuevoPlato(@Valid @ModelAttribute("nuevoPlato") PlatoCreacionDTO nuevoPlato, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes, Authentication authentication) {
 
         // Validación del formulario
         if(bindingResult.hasErrors()){
@@ -76,32 +80,40 @@ public class DuenoController {
         try {
 
             // Añadir plato nuevo a la carta
-            platoService.anadirPlatoALaCarta(nuevoPlato);
+            Plato plato = platoService.anadirPlatoALaCarta(nuevoPlato);
+
+            log.info("Dueño '{}' ha añadido a la carta el plato #{} '{}' ({}, {} €)", authentication.getName(), plato.getIdPlato(), plato.getNombre(), plato.getCategoria(), plato.getPrecio());
 
         } catch (IllegalArgumentException e) {
 
-            // Manejo de excepciones
-            redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
+            // Se vuelve a abrir el modal con los datos y el error
+            model.addAttribute("error", e.getMessage());
+            model.addAttribute("mostrarModal", true);
+            cargarFacturacion(model);
+            cargarFacturacionSemanal(model);
+            cargarCarta(model);
 
-            return "redirect:/dueno/panel";
+            return "dueno/panel";
         }
 
         // Mensaje de éxito del plato añadido
-        redirectAttributes.addFlashAttribute("mensaje", "Plato '" + nuevoPlato.getNombre().trim() + "' añadido a la carta.");
+        redirectAttributes.addFlashAttribute("mensaje", "Producto '" + nuevoPlato.getNombre().trim() + "' añadido a la carta.");
 
         return "redirect:/dueno/panel";
     }
 
     @PostMapping("/platos/{id}/anadir-existente")
-    public String anadirPlatoExistente(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String anadirPlatoExistente(@PathVariable Long id, RedirectAttributes redirectAttributes, Authentication authentication) {
 
         try {
 
             // Poner plato retirado visible en carta
             Plato plato = platoService.anadirPlatoExistenteALaCarta(id);
 
+            log.info("Dueño '{}' ha vuelto a añadir a la carta el plato #{} '{}'", authentication.getName(), plato.getIdPlato(), plato.getNombre());
+
             // Mensaje de éxito plato retirado añadido
-            redirectAttributes.addFlashAttribute("mensaje", "Plato '" + plato.getNombre() + "' añadido de nuevo a la carta.");
+            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + plato.getNombre() + "' añadido de nuevo a la carta.");
 
         } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
 
@@ -113,43 +125,61 @@ public class DuenoController {
     }
 
     @PostMapping("/platos/{id}/editar")
-    public String guardarEdicionPlato(@PathVariable Long id, @Valid @ModelAttribute("platoEditado") PlatoModificacionDTO platoEditado, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+    public String guardarEdicionPlato(@PathVariable Long id, @Valid @ModelAttribute("platoEditado") PlatoModificacionDTO platoEditado, BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes, Authentication authentication) {
+
         // El plato que se modifica es el de la URL
         platoEditado.setIdPlato(id);
 
-        // Validacion de formulario
+        // Validación de formulario
         if(bindingResult.hasErrors()){
 
-            // Informa de los errores y abre modal de edicion
+            // Informa de los errores y abre modal de edición
             model.addAttribute("mostrarModalEditar", true);
             cargarFacturacion(model);
             cargarFacturacionSemanal(model);
             cargarCarta(model);
+
             return "dueno/panel";
         }
 
         try {
+
             // Guardar cambios del plato modificado
             Plato plato = platoService.modificarPlato(platoEditado);
-            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + plato.getNombre() + "' modificado.");            
+
+            log.info("Dueño '{}' ha modificado el plato #{} '{}' (precio: {} €, categoría: {})", authentication.getName(), plato.getIdPlato(), plato.getNombre(), plato.getPrecio(), plato.getCategoria());
+
+            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + plato.getNombre() + "' modificado correctamente.");
+
         } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
+
             redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
         }
+
         return "redirect:/dueno/panel";
     }
 
 
     @PostMapping("/platos/{id}/eliminar")
-    public String eliminarPlato(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String eliminarPlato(@PathVariable Long id, RedirectAttributes redirectAttributes, Authentication authentication) {
+
         try {
+
             // Nombre para el mensaje
             String nombre = platoService.buscarPorId(id).getNombre();
+
             // Retirar plato de la carta
             platoService.retirarPlatoDeLaCarta(id);
-            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + nombre + "' retirado de la carta. Puedes volver a añadirlo desde 'Añadir producto'.");
+
+            log.info("Dueño '{}' ha retirado de la carta el plato #{} '{}'", authentication.getName(), id, nombre);
+
+            redirectAttributes.addFlashAttribute("mensaje", "Producto '" + nombre + "' retirado de la carta. Puedes volver a añadirlo desde Añadir producto.");
+
         } catch (IllegalArgumentException | OperacionNoPermitidaException e) {
+
             redirectAttributes.addFlashAttribute("errorCarta", e.getMessage());
         }
+
         return "redirect:/dueno/panel";
     }
 

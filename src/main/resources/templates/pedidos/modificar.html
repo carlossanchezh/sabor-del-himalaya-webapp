@@ -14,8 +14,8 @@
 <!-- Layout -->
 <div th:replace="~{layout :: header}"></div>
 
-<!-- P11 (US-09): Modificar un pedido ya confirmado durante los 10 minutos siguientes -->
-<main class="container my-4 mt-4">
+<!-- Modificar un pedido ya confirmado durante los 10 minutos siguientes -->
+<main class="container my-4">
 
     <!-- Mensajes de error -->
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
@@ -24,18 +24,20 @@
 
         <!-- Lista editable de productos del pedido -->
         <section class="col-lg-8">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-body">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <h2 class="h4 mb-0" th:text="'Modificar pedido #' + ${pedido.idPedido}">Modificar pedido #0</h2>
+                        <h1 class="h4 mb-0" th:text="'Modificar pedido #' + ${pedido.idPedido}">Modificar pedido #0</h1>
 
                         <!-- Tiempo que queda para poder modificar -->
                         <span class="badge text-bg-warning fs-6" id="tiempo-restante"
-                              th:attr="data-segundos=${segundosRestantes}">Quedan 10:00 min</span>
+                              th:attr="data-segundos=${segundosRestantes}">Quedan 00:00 minutos para modificar el pedido</span>
                     </div>
-                    <p class="text-muted small mt-2">Cambia la cantidad de los productos. Pon 0 para quitar un producto del pedido.</p>
+                    <p class="text-muted small mt-2">Cambia la cantidad de los productos o elimínalos del pedido.</p>
 
                     <form th:action="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}" method="post" id="form-modificar">
+
+                        <h3 class="h5 mb-2">Productos del pedido:</h3>
 
                         <!-- Una fila por línea del pedido -->
                         <div class="d-flex align-items-center gap-2 border-bottom py-2"
@@ -45,8 +47,6 @@
                             <div class="flex-grow-1">
                                 <span th:text="${linea.nombre}">Nombre del producto</span>
                                 <div class="small text-muted" th:if="${linea.detalle}" th:text="${linea.detalle}"></div>
-                                <div class="small text-muted"
-                                     th:text="${#numbers.formatDecimal(linea.precioUnitario, 1, 'POINT', 2, 'COMMA')} + ' € / unidad'">0,00 € / unidad</div>
                             </div>
 
                             <!-- Cantidad -->
@@ -60,6 +60,10 @@
                             <!-- Subtotal de la línea (se actualiza al cambiar la cantidad) -->
                             <span class="text-end subtotal" style="width: 5.5rem"
                                   th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+
+                            <!-- Botón de quitar (pone la cantidad a 0 y oculta la fila) -->
+                            <button type="button" class="btn btn-sm btn-danger btn-quitar"
+                                    th:aria-label="'Quitar ' + ${linea.nombre}">✕</button>
                         </div>
 
                         <!-- Botones -->
@@ -74,7 +78,7 @@
 
         <!-- Nuevo importe -->
         <aside class="col-lg-4">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-body">
                     <h2 class="h4">Nuevo importe</h2>
 
@@ -89,14 +93,9 @@
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold">Total</span>
+                        <span class="fw-bold">Importe total</span>
                         <span class="fs-4 text-success" id="total"
                               th:text="${#numbers.formatDecimal(resumen.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
-                    </div>
-
-                    <div class="alert alert-warning small mt-3 mb-0" id="aviso-plazo">
-                        Pasados <strong th:text="${minutosModificacion}">10</strong> minutos
-                        desde la realización del pedido ya no se podrá modificar.
                     </div>
                 </div>
             </div>
@@ -137,21 +136,30 @@
         });
         recalcular();
 
+        // Botón X: pone la cantidad a 0 y oculta la fila
+        document.querySelectorAll('.btn-quitar').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fila = btn.closest('.d-flex');
+                fila.querySelector('.cantidad').value = 0;
+                fila.classList.add('d-none');
+                recalcular();
+            });
+        });
+
         // Cuenta atrás: al terminar el plazo se desactiva el botón de guardar
         var badge = document.getElementById('tiempo-restante');
         var segundos = parseInt(badge.dataset.segundos, 10) || 0;
 
         function actualizarTiempo() {
             if (segundos <= 0) {
-                badge.textContent = 'Plazo terminado';
+                badge.textContent = 'Tiempo para modificar el pedido terminado';
                 badge.classList.replace('text-bg-warning', 'text-bg-danger');
                 document.getElementById('btn-guardar').disabled = true;
-                document.getElementById('aviso-plazo').classList.replace('alert-warning', 'alert-danger');
                 return;
             }
             var min = Math.floor(segundos / 60);
             var seg = segundos % 60;
-            badge.textContent = 'Quedan ' + min + ':' + (seg < 10 ? '0' : '') + seg + ' min';
+            badge.textContent = 'Quedan ' + min + ':' + (seg < 10 ? '0' : '') + seg + ' minutos para modificar el pedido';
             segundos--;
             setTimeout(actualizarTiempo, 1000);
         }

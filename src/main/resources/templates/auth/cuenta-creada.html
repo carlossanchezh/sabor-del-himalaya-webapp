@@ -36,7 +36,7 @@
                     <!-- Icono de Check -->
                     <div class="icono-check">✓</div>
 
-                    <h2 class="fw-bold mb-3" style="color: #198754;">¡Cuenta creada!</h2>
+                    <h1 class="h2 fw-bold mb-3" style="color: #198754;">¡Cuenta creada!</h1>
 
                     <div th:if="${mensajeError}" class="alert alert-danger" th:text="${mensajeError}"></div>
 
@@ -56,11 +56,11 @@
                         <!-- Botón de reenviar -->
                         <form th:action="@{/auth/reenviar}" method="post" class="m-0 flex-fill">
                             <input type="hidden" name="logincorreo" th:value="${login}">
-                            <button type="submit" class="btn btn-secondary w-100">REENVIAR CORREO</button>
+                            <button type="submit" class="btn btn-secondary w-100">Reenviar Correo</button>
                         </form>
 
                         <!-- Botón para ir al login -->
-                        <a th:href="@{/auth/login}" class="btn btn-primary flex-fill">INICIAR SESIÓN</a>
+                        <a th:href="@{/auth/login}" class="btn btn-primary flex-fill">Iniciar Sesión</a>
                     </div>
 
                 </div>

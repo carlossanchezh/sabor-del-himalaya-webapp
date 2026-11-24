@@ -15,7 +15,7 @@
 <div th:replace="~{layout :: header}"></div>
 
 <!-- Editar productos del pedido antes de confirmarlo -->
-<main class="container my-4 mt-4">
+<main class="container my-4">
 
     <!-- Mensajes de error -->
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
@@ -24,12 +24,14 @@
 
         <!-- Lista editable de productos -->
         <section class="col-lg-8">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-body">
-                    <h2 class="h4">Editar productos del pedido</h2>
-                    <p class="text-muted small">Pedido aún no enviado. Pulsa ✕ para quitar un producto.</p>
+                    <h1 class="h4">Editar productos del pedido</h1>
+                    <p class="text-muted small">Pedido aún no enviado. Cambia la cantidad de los productos o elimínalos del pedido.</p>
 
                     <form th:action="@{/pedidos/editar-pedido-temporal}" method="post">
+
+                        <h3 class="h5 mb-2">Productos del pedido:</h3>
 
                         <!-- Iteramos sobre las líneas del resumen -->
                         <div class="d-flex align-items-center gap-2 border-bottom py-2"
@@ -42,13 +44,14 @@
                             </div>
 
                             <!-- Input para cambiar la cantidad -->
-                            <input type="number" class="form-control form-control-sm" style="width: 5rem"
+                            <input type="number" class="form-control form-control-sm cantidad" style="width: 5rem"
                                    min="0" max="99" required th:aria-label="'Cantidad de ' + ${linea.nombre}"
                                    th:name="${linea.menu} ? 'cantidadesMenu' : 'cantidadesPlato'"
-                                   th:value="${linea.cantidad}">
+                                   th:value="${linea.cantidad}"
+                                   th:attr="data-precio=${linea.precioUnitario}">
 
                             <!-- Subtotal actualizado -->
-                            <span class="text-end" style="width: 5.5rem"
+                            <span class="text-end subtotal" style="width: 5.5rem"
                                   th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
 
                             <!-- Botón de eliminar (La X) -->
@@ -69,16 +72,24 @@
 
         <!-- Panel de resumen -->
         <aside class="col-lg-4">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-body">
                     <h2 class="h4">Resumen del pedido</h2>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold">Total actual</span>
-                        <span class="fs-4 text-success"
+
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Importe anterior</span>
+                        <span id="importe-anterior" th:attr="data-importe=${resumenPedidoTemporal.total}"
                               th:text="${#numbers.formatDecimal(resumenPedidoTemporal.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
                     </div>
-                    <div class="alert alert-warning small mt-3 mb-0">
-                        Al guardar los cambios volverás a la revisión para seguir añadiendo productos o confirmarlo definitivamente.
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Diferencia</span>
+                        <span id="diferencia">0,00 €</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Importe total</span>
+                        <span class="fs-4 text-success" id="total"
+                              th:text="${#numbers.formatDecimal(resumenPedidoTemporal.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
                     </div>
                 </div>
             </div>
@@ -89,5 +100,35 @@
 <!-- Bootstrap JS Bundle (necesario para componentes interactivos como modales o pestañas) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+<!-- Cálculo del nuevo importe al cambiar las cantidades (el servidor lo recalcula al guardar) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        function euros(valor) {
+            return valor.toFixed(2).replace('.', ',') + ' €';
+        }
+
+        var anterior = parseFloat(document.getElementById('importe-anterior').dataset.importe);
+        var inputs = document.querySelectorAll('.cantidad');
+
+        function recalcular() {
+            var total = 0;
+            inputs.forEach(function (input) {
+                var cantidad = Math.max(0, parseInt(input.value, 10) || 0);
+                var subtotal = cantidad * parseFloat(input.dataset.precio);
+                input.parentElement.querySelector('.subtotal').textContent = euros(subtotal);
+                total += subtotal;
+            });
+            var diferencia = total - anterior;
+            document.getElementById('total').textContent = euros(total);
+            document.getElementById('diferencia').textContent = (diferencia > 0 ? '+' : '') + euros(diferencia);
+        }
+
+        inputs.forEach(function (input) {
+            input.addEventListener('input', recalcular);
+        });
+        recalcular();
+    });
+</script>
 </body>
 </html>

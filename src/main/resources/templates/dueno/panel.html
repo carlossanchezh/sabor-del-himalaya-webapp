@@ -3,48 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Panel Dueño - Carta</title>
+    <title>Panel del dueño - Sabor del Himalaya</title>
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
 </head>
-<body class="bg-light d-flex flex-column" style="height: 100vh; overflow: hidden;">
+<body class="bg-light d-flex flex-column vh-100">
 
 <!-- Layout -->
 <div th:replace="~{layout :: header}"></div>
 
 <!-- Contenido principal: ocupa el resto del viewport -->
-<main class="container-fluid px-3 py-3 d-flex flex-column flex-grow-1" style="min-height: 0;">
+<main class="container my-4 flex-grow-1 d-flex flex-column" style="min-height: 0;">
 
-    <!-- Mensajes de éxito o error (encuadrados) -->
-    <div class="d-flex justify-content-center flex-shrink-0">
-        <div style="width: 100%; max-width: 1476px;">
-            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show mb-2" th:text="${mensaje}">Mensaje</div>
-            <div th:if="${errorCarta}" class="alert alert-danger alert-dismissible fade show mb-2" th:text="${errorCarta}">Error</div>
-        </div>
-    </div>
+    <!-- Mensajes de éxito o error -->
+    <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show flex-shrink-0" th:text="${mensaje}">Mensaje</div>
+    <div th:if="${errorCarta}" class="alert alert-danger alert-dismissible fade show flex-shrink-0" th:text="${errorCarta}">Error</div>
 
     <!-- Fila de contenido: carta (izquierda) + facturación (derecha) -->
-    <div class="d-flex gap-3 flex-grow-1 justify-content-center" style="min-height: 0;">
+    <div class="row g-4 flex-grow-1" style="min-height: 0;">
 
-        <!-- Columna Izquierda Carta -->
-        <section class="d-flex align-self-start"
-                 style="flex: 1 1 0; max-width: 1100px; height: 75vh; min-width: 0; min-height: 0;">
-            <div class="card shadow-sm flex-grow-1 d-flex flex-column" style="min-height: 0;">
+        <!-- Columna Izquierda Carta: su altura la marca la columna derecha -->
+        <section class="col-lg-8" style="min-height: 0;">
+            <div class="position-relative h-100" style="min-height: 400px;">
+                <div class="card shadow-sm d-flex flex-column position-absolute top-0 bottom-0 start-0 end-0">
 
                 <!-- Cabecera fija de la carta -->
                 <div class="card-header bg-white d-flex justify-content-between align-items-center flex-shrink-0">
-                    <h2 class="h5 mb-0">Carta del restaurante</h2>
+                    <h1 class="h4 mb-0">Carta del restaurante</h1>
 
                     <!-- Botón para abrir el modal de añadir producto -->
-                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAnadirPlato">
                         Añadir Producto
                     </button>
                 </div>
 
                 <!-- Único bloque con scroll -->
-                <div class="card-body p-0" style="overflow-y: auto;">
+                <div class="card-body p-0 flex-grow-1" style="overflow-y: auto; min-height: 0;">
 
                     <p th:if="${#lists.isEmpty(platos)}" class="text-muted text-center py-5 mb-0">
                         Todavía no hay productos en la carta.
@@ -62,22 +58,27 @@
                         </thead>
                         <tbody>
                         <tr th:each="plato : ${platos}">
-                            <td class="fw-semibold" th:text="${plato.nombre}">Nombre</td>
-                            <td class="text-muted" th:text="${plato.descripcion}">Descripción</td>
-                            <td><span class="badge text-bg-secondary" th:text="${plato.categoria}">CATEGORIA</span></td>
-                            <td class="text-end fw-semibold"
+                            <td class="fw-semibold text-nowrap" th:text="${plato.nombre}">Nombre</td>
+                            <td class="text-muted">
+                                <div class="d-flex align-items-center" style="min-height: 3em;">
+                                    <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"
+                                         th:text="${plato.descripcion}">Descripción</div>
+                                </div>
+                            </td>
+                            <td class="text-nowrap"><span class="badge text-bg-secondary" th:text="${plato.categoria}">CATEGORIA</span></td>
+                            <td class="text-end fw-semibold text-nowrap"
                                 th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</td>
 
-                            <!-- Botones de editar (US-16) y eliminar (US-18): los datos del plato van en atributos data-* -->
+                            <!-- Botones de editar y eliminar: los datos del plato van en atributos data-* -->
                             <td class="text-end text-nowrap">
-                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                <button type="button" class="btn btn-primary btn-sm"
                                         data-bs-toggle="modal" data-bs-target="#modalEditarPlato"
                                         th:data-id="${plato.idPlato}"
                                         th:data-nombre="${plato.nombre}"
                                         th:data-descripcion="${plato.descripcion}"
                                         th:data-precio="${plato.precio}"
                                         th:data-categoria="${plato.categoria}">Editar</button>
-                                <button type="button" class="btn btn-outline-danger btn-sm"
+                                <button type="button" class="btn btn-danger btn-sm"
                                         data-bs-toggle="modal" data-bs-target="#modalEliminarPlato"
                                         th:data-id="${plato.idPlato}"
                                         th:data-nombre="${plato.nombre}">Eliminar</button>
@@ -87,12 +88,12 @@
                     </table>
                 </div>
             </div>
+            </div>
         </section>
 
 
         <!-- Columna Derecha Facturación -->
-        <aside class="d-flex flex-column gap-3 flex-shrink-0 align-self-start"
-               style="width: 360px; height: 75vh; overflow-y: auto;">
+        <aside class="col-lg-4 d-flex flex-column gap-3">
 
             <!-- Facturación del día -->
             <div class="card shadow-sm">
@@ -122,11 +123,11 @@
             </div>
 
             <!-- Gráfica de facturación de los últimos 7 días -->
-            <div class="card shadow-sm flex-grow-1 d-flex flex-column" style="min-height: 0;">
+            <div class="card shadow-sm d-flex flex-column">
                 <div class="card-header bg-white py-2 flex-shrink-0">
                     <h3 class="h6 mb-0">Facturación en los últimos 7 días</h3>
                 </div>
-                <div class="card-body p-2 flex-grow-1" style="position: relative; min-height: 0;">
+                <div class="card-body p-2" style="position: relative; height: 260px;">
                     <canvas id="graficaSemanal"></canvas>
                 </div>
             </div>
@@ -158,14 +159,14 @@
                             </small>
                         </div>
                         <form th:action="@{/dueno/platos/{id}/anadir-existente(id=${retirado.idPlato})}" method="post" class="m-0">
-                            <button type="submit" class="btn btn-outline-success btn-sm">Añadir</button>
+                            <button type="submit" class="btn btn-success btn-sm">Añadir</button>
                         </form>
                     </li>
                 </ul>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-success w-100" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
+                <button type="button" class="btn btn-primary w-100" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalNuevoPlato">
                     + Crear producto nuevo
                 </button>
             </div>
@@ -223,7 +224,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-success">Guardar producto</button>
                 </div>
             </form>
@@ -231,7 +232,7 @@
     </div>
 </div>
 
-<!-- P19: Pop-up para modificar un producto de la carta (US-16) -->
+<!-- Pop-up para modificar un producto de la carta -->
 <div class="modal fade" id="modalEditarPlato" tabindex="-1" aria-labelledby="tituloEditarPlato" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -243,6 +244,7 @@
                 </div>
 
                 <div class="modal-body">
+                    <div th:if="${errorEditar}" class="alert alert-danger" th:text="${errorEditar}">Error</div>
                     <input type="hidden" id="editarIdPlato" th:field="*{idPlato}">
 
                     <div class="mb-3">
@@ -279,15 +281,15 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Guardar cambios</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- P22: Pop-up para confirmar que se retira un producto de la carta (US-18) -->
+<!-- Pop-up para confirmar que se retira un producto de la carta -->
 <div class="modal fade" id="modalEliminarPlato" tabindex="-1" aria-labelledby="tituloEliminarPlato" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -299,11 +301,11 @@
 
                 <div class="modal-body">
                     <p class="mb-2">¿Seguro que quieres eliminar <strong id="nombreEliminar">este producto</strong> de la carta?</p>
-                    <small class="text-muted">Los clientes dejarán de verlo, pero no se borra: podrás volver a añadirlo desde «Añadir Producto».</small>
+                    <small class="text-muted">El producto se retirará de la carta y los clientes dejarán de verlo, pero no se borra: puedes volver a añadirlo desde Añadir Producto.</small>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </div>
             </form>
@@ -365,6 +367,9 @@
 
         modal.addEventListener('show.bs.modal', function (event) {
             if (!event.relatedTarget) return;
+
+            const alerta = this.querySelector('.alert-danger');
+            if (alerta) alerta.remove();
 
             this.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(el => {
                 if (el.tagName === 'SELECT') {

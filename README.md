@@ -1,5 +1,6 @@
 # Sabor del Himalaya
 
+![License](https://img.shields.io/github/license/carlossanchezh/sabor-del-himalaya-webapp?style=flat)
 [![Build](https://img.shields.io/github/actions/workflow/status/carlossanchezh/sabor-del-himalaya-webapp/ci.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=Build)](https://github.com/carlossanchezh/sabor-del-himalaya-webapp/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/Version-2.0.0-blue?style=flat)
 ![Maven](https://img.shields.io/badge/Maven-Build-C71A36?style=flat&logo=apachemaven&logoColor=white)
@@ -13,6 +14,21 @@
 **Sabor del Himalaya** es una aplicación web para la gestión de pedidos de comida a domicilio de un restaurante nepalí.
 
 La plataforma permite a los clientes consultar la carta, configurar sus pedidos y realizar un seguimiento de los mismos. Además, ofrece herramientas específicas para que el chef gestione el menú diario, el personal controle el estado de los pedidos y el dueño administre la carta y consulte la facturación.
+
+## Contenidos
+
+- [Descripción](#descripción)
+- [Funcionalidades](#funcionalidades)
+- [Tecnologías](#tecnologías)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Arquitectura](#arquitectura)
+- [Modelo de datos](#modelo-de-datos)
+- [Reglas de negocio](#reglas-de-negocio)
+- [Tests](#tests)
+- [Integración continua](#integración-continua)
+- [Logs](#logs)
+- [Contribuidores](#contribuidores)
+- [Licencia](#licencia)
 
 ## Funcionalidades
 
@@ -543,3 +559,7 @@ La aplicación utiliza **SLF4J** para registrar en `logs/sabor-del-himalaya.log`
   <a href="https://github.com/FrancoSosaMartinez">@FrancoSosaMartinez</a> ·
   <a href="https://github.com/dawesito">@dawesito</a>
 </p>
+
+## Licencia
+
+Distribuido bajo la licencia MIT. Consulta el archivo [LICENSE](LICENSE.md) para más información.

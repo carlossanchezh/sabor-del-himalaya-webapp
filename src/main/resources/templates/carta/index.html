@@ -30,7 +30,7 @@
 <!-- Layout -->
 <div th:replace="~{layout :: header}"></div>
 
-<main class="container mt-4">
+<main class="container my-4">
 
     <!-- Avisos al añadir productos al pedido -->
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
@@ -43,7 +43,7 @@
 
                     <!-- Título y botón para ir al historial de pedidos -->
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <h1 class="h3 mb-0">Nuestra Carta</h1>
+                        <h1 class="h4 mb-0">Nuestra Carta</h1>
                         <a th:href="@{/pedidos/mis-pedidos}" class="btn btn-primary">Mis pedidos</a>
                     </div>
                     <p class="text-muted">Consulta la carta por categorías o el menú del día.</p>
@@ -91,17 +91,18 @@
                             <ul class="list-group" th:unless="${#lists.isEmpty(seccion.value)}">
                                 <li class="list-group-item d-flex justify-content-between align-items-start"
                                     th:each="plato : ${seccion.value}">
-                                    <div>
+                                    <div class="me-3" style="min-width: 0;">
                                         <div class="fw-semibold" th:text="${plato.nombre}">Nombre</div>
-                                        <small class="text-muted" th:text="${plato.descripcion}">Descripción</small>
+                                        <small class="text-muted d-block text-truncate"
+                                               th:text="${plato.descripcion}"
+                                               th:title="${plato.descripcion}">Descripción</small>
                                     </div>
                                     <div class="d-flex align-items-center gap-3 flex-shrink-0">
                                         <span class="fw-semibold"
-                                              th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
+                                            th:text="${#numbers.formatDecimal(plato.precio, 1, 'POINT', 2, 'COMMA') + ' €'}">0,00 €</span>
 
                                         <!-- Añadir producto al pedido -->
                                         <div th:replace="~{pedidos/fragmentos :: botonAnadirPlato(${plato}, ${'cat-' + st.index})}"></div>
-
                                     </div>
                                 </li>
                             </ul>

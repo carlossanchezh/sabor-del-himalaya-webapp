@@ -15,7 +15,7 @@
 <div th:replace="~{layout :: header}"></div>
 
 <!-- Revisar y confirmar pedido -->
-<main class="container my-4 mt-4">
+<main class="container my-4">
 
     <!-- Mensajes de error -->
     <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
@@ -24,10 +24,10 @@
 
         <!-- Tabla con el resumen de productos y totales -->
         <section class="col-lg-8">
-            <div class="card">
+            <div class="card shadow-sm">
                 <div class="card-body">
-                    <h2 class="h4">Revisar y confirmar pedido</h2>
-                    <p class="text-muted small">Comprueba los productos y el importe antes de enviarlo</p>
+                    <h1 class="h4">Revisar y confirmar pedido</h1>
+                    <p class="text-muted small">Comprueba los productos y el importe del pedido antes de enviarlo</p>
 
                     <!-- Productos seleccionados e importe total -->
                     <table class="table align-middle">
@@ -54,7 +54,7 @@
                         </tbody>
                         <tfoot>
                         <tr>
-                            <th colspan="3">Total del pedido</th>
+                            <th colspan="3">Importe total</th>
                             <th class="text-end text-success"
                                 th:text="${#numbers.formatDecimal(resumenPedidoTemporal.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</th>
                         </tr>
@@ -63,8 +63,8 @@
 
                     <!-- Botones de navegación -->
                     <div class="d-flex gap-2">
-                        <a class="btn btn-secondary flex-fill" th:href="@{/carta}">Seguir añadiendo</a>
-                        <a class="btn btn-warning flex-fill" th:href="@{/pedidos/editar-pedido-temporal}">Editar productos</a>
+                        <a class="btn btn-secondary flex-fill" th:href="@{/carta}">Añadir más productos</a>
+                        <a class="btn btn-primary flex-fill" th:href="@{/pedidos/editar-pedido-temporal}">Modificar productos</a>
                     </div>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                                   required maxlength="255" th:text="${direccionEntrega}"></textarea>
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <span class="fw-bold">Total a pagar</span>
+                            <span class="fw-bold">Importe total</span>
                             <span class="fs-4 text-success"
                                   th:text="${#numbers.formatDecimal(resumenPedidoTemporal.total, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
                         </div>

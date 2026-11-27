@@ -64,6 +64,10 @@
             font-size: 16px;
             font-weight: bold;
         }
+
+        .toggle-productos { cursor: pointer; user-select: none; }
+        .toggle-productos .flecha { display: inline-block; transition: transform .2s; }
+        .toggle-productos[aria-expanded="true"] .flecha { transform: rotate(90deg); }
     </style>
 
 </head>
@@ -73,20 +77,19 @@
 <div th:replace="~{layout :: header}"></div>
 
 <!-- Seguimiento de los pedidos del usuario -->
-<main class="container my-4 mt-4">
-    <div class="card">
+<main class="container my-4">
+
+    <!-- Avisos de éxito y error -->
+    <div class="alert alert-success" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+
+    <div class="card shadow-sm">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <h2 class="h4 mb-0">Mis pedidos</h2>
+                <h1 class="h4 mb-0">Mis pedidos</h1>
 
-                <div class="d-flex align-items-center gap-3">
-                    <!-- Mensaje de éxito tras confirmar un pedido -->
-                    <div class="alert alert-success py-1 px-3 mb-0" th:if="${mensaje}" th:text="${mensaje}"></div>
-
-                    <!-- Botón para volver a la carta -->
-                    <a th:href="@{/carta}" class="btn btn-primary">Volver a la carta</a>
-                </div>
-
+                <!-- Botón para volver a la carta -->
+                <a th:href="@{/carta}" class="btn btn-primary">Volver a la carta</a>
             </div>
 
             <!-- Estado vacío: El usuario no ha realizado pedidos todavía -->
@@ -105,6 +108,40 @@
                         <div class="small text-muted" th:text="${pedido.direccionEntrega}">C/ ejemplo s/n</div>
                         <div class="fs-5 text-success fw-bold"
                              th:text="${#numbers.formatDecimal(pedido.importeTotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</div>
+
+                        <!-- Botones Modificar y Eliminar solo durante los 10 minutos siguientes a la realización del pedido -->
+                        <div class="mt-2 plazo-modificacion" th:if="${modificables.containsKey(pedido.idPedido)}"
+                             th:attr="data-segundos=${modificables[pedido.idPedido]}">
+
+                            <div class="small text-muted">Tiempo para cambios: <span class="fw-bold tiempo">10:00</span> min</div>
+
+                            <div class="d-flex gap-2 mt-1">
+                                <a class="btn btn-primary btn-sm"
+                                   th:href="@{/pedidos/{id}/modificar(id=${pedido.idPedido})}">Modificar</a>
+
+                                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal"
+                                        th:attr="data-bs-target=${'#modalEliminar-' + pedido.idPedido}">Eliminar</button>
+                            </div>
+
+                            <!-- Ventana pop-up de confirmación para eliminar el pedido -->
+                            <div class="modal fade" tabindex="-1" aria-hidden="true"
+                                 th:id="'modalEliminar-' + ${pedido.idPedido}">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-body p-4">
+                                            <h2 class="h5" th:text="'¿Eliminar el pedido #' + ${pedido.idPedido} + '?'">¿Eliminar el pedido?</h2>
+                                            <p class="small text-muted mb-2">El pedido se cancelará y dejará de aparecer como pedido activo. Esta acción no se puede deshacer.</p>
+                                            <p class="small text-muted mb-3">Tiempo restante para eliminar: <span class="fw-bold tiempo">10:00</span></p>
+                                            <form th:action="@{/pedidos/{id}/cancelar(id=${pedido.idPedido})}" method="post"
+                                                  class="d-flex gap-2 justify-content-end">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Eliminar pedido</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Estado actual y barra de progreso -->
@@ -112,7 +149,7 @@
 
                         <!-- Badge del estado actual -->
                         <span class="badge fs-6 mb-4"
-                              th:classappend="${pedido.estado.name() == 'ENTREGADO' ? 'bg-success' : (pedido.estado.name() == 'CANCELADO' ? 'bg-danger' : 'bg-primary')}"
+                              th:classappend="${pedido.estado.name() == 'ENTREGADO' ? 'text-bg-success' : (pedido.estado.name() == 'CANCELADO' ? 'text-bg-danger' : (pedido.estado.name() == 'RECIBIDO' ? 'border border-secondary text-secondary' : (pedido.estado.name() == 'EN_PREPARACION' ? 'text-bg-secondary' : 'text-bg-primary')))}"
                               th:text="${nombresEstado[pedido.estado]}">Recibido</span>
 
                         <!-- Barra de progreso (oculta si está cancelado) -->
@@ -136,25 +173,32 @@
 
                     <!-- Información de los productos del pedido -->
                     <div class="mt-3 pt-3 border-top">
-                        <h4 class="h6 text-muted mb-2">Productos del pedido:</h4>
-                        <ul class="list-unstyled small mb-0">
+                        <h4 class="h6 text-muted mb-2 toggle-productos"
+                            role="button" aria-expanded="false"
+                            data-bs-toggle="collapse"
+                            th:attr="data-bs-target='#productos-' + ${pedido.idPedido}">
+                            <span class="flecha me-1">▸</span>Productos del pedido
+                        </h4>
+                        <div class="collapse" th:id="'productos-' + ${pedido.idPedido}">
+                            <ul class="list-unstyled small mb-0">
 
-                            <!-- Iteramos sobre el resumen del pedido actual usando su ID -->
-                            <li th:each="linea : ${resumenesPedidos[pedido.idPedido].lineas}" class="mb-2">
+                                <!-- Iteramos sobre el resumen del pedido actual usando su ID -->
+                                <li th:each="linea : ${resumenesPedidos[pedido.idPedido].lineas}" class="mb-2">
 
-                                <!-- Cantidad del producto -->
-                                <span class="badge text-bg-light border me-2 fw-normal" th:text="${linea.cantidad} + 'x'">1x</span>
+                                    <!-- Cantidad del producto -->
+                                    <span class="badge text-bg-light border me-2 fw-normal" th:text="${linea.cantidad} + 'x'">1x</span>
 
-                                <!-- Nombre del producto -->
-                                <span th:text="${linea.nombre}">Plato</span>
+                                    <!-- Nombre del producto -->
+                                    <span th:text="${linea.nombre}">Plato</span>
 
-                                <!-- Detalle del menú si aplica -->
-                                <span class="text-muted ms-1" th:if="${linea.detalle}" th:text="'(' + ${linea.detalle} + ')'"></span>
+                                    <!-- Detalle del menú si aplica -->
+                                    <span class="text-muted ms-1" th:if="${linea.detalle}" th:text="'(' + ${linea.detalle} + ')'"></span>
 
-                                <!-- Subtotal alineado a la derecha -->
-                                <span class="float-end text-muted" th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
-                            </li>
-                        </ul>
+                                    <!-- Subtotal alineado a la derecha -->
+                                    <span class="float-end text-muted" th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
 
                 </div>
@@ -165,6 +209,45 @@
 
 <!-- Bootstrap JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Cuenta atrás del plazo de modificación; al terminar se oculta el botón -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.plazo-modificacion').forEach(function (bloque) {
+            var segundos = parseInt(bloque.dataset.segundos, 10) || 0;
+            var tiempos = bloque.querySelectorAll('.tiempo');
+
+            function actualizar() {
+                if (segundos <= 0) {
+                    // Si el modal está abierto, se cierra antes
+                    var modalAbierto = bloque.querySelector('.modal.show');
+
+                    if (modalAbierto) {
+                        modalAbierto.addEventListener('hidden.bs.modal', function () {
+                            bloque.remove();
+                        });
+
+                        bootstrap.Modal.getInstance(modalAbierto).hide();
+                    } else {
+                        bloque.remove();
+                    }
+
+                    return;
+                }
+                var min = Math.floor(segundos / 60);
+                var seg = segundos % 60;
+                var texto = min + ':' + (seg < 10 ? '0' : '') + seg;
+                tiempos.forEach(function (t) {
+                    t.textContent = texto;
+                });
+                segundos--;
+                setTimeout(actualizar, 1000);
+            }
+
+            actualizar();
+        });
+    });
+</script>
 
 </body>
 </html>

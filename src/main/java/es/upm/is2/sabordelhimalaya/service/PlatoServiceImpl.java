@@ -39,8 +39,8 @@ public class PlatoServiceImpl implements PlatoService {
 
     @Override
     public List<Plato> listarPlatosDelChef() {
-        // TODO (US-14): return platoRepository.findByEsDelChefTrue();
-        throw new UnsupportedOperationException("TODO US-14");
+        // Platos creados por el chef (siempre fuera de carta) para reutilizarlos en los menús diarios
+        return platoRepository.findByEsDelChefTrue();
     }
 
     @Override
@@ -50,10 +50,72 @@ public class PlatoServiceImpl implements PlatoService {
     }
 
     @Override
+    @Transactional
     public Plato crearPlatoFueraDeCarta(PlatoCreacionDTO dto) {
-        // TODO (US-14): Crear Plato con estaEnCarta=false, esDelChef=true.
-        // Poner precio del palto creado por el chef a 0
-        throw new UnsupportedOperationException("TODO US-14");
+
+        if (dto == null) {
+            throw new IllegalArgumentException("Debes indicar los datos del plato.");
+        }
+        if (dto.getNombre() == null || dto.getNombre().isBlank()) {
+            throw new IllegalArgumentException("El nombre del plato es obligatorio.");
+        }
+        if (dto.getNombre().trim().length() > 120) {
+            throw new IllegalArgumentException("El nombre del plato no puede superar 120 caracteres.");
+        }
+        if (dto.getDescripcion() == null || dto.getDescripcion().isBlank()) {
+            throw new IllegalArgumentException("La descripción del plato es obligatoria.");
+        }
+        if (dto.getDescripcion().trim().length() > 255) {
+            throw new IllegalArgumentException("La descripción del plato no puede superar 255 caracteres.");
+        }
+        if (dto.getCategoria() == null) {
+            throw new IllegalArgumentException("Debes seleccionar la categoría del plato.");
+        }
+
+        // El menú diario solo tiene entrantes, principales y postres: las bebidas no se crean aquí
+        if (dto.getCategoria() == CategoriaPlato.BEBIDA) {
+            throw new IllegalArgumentException("Los platos fuera de carta solo pueden ser entrantes, principales o postres.");
+        }
+
+        String nombre = dto.getNombre().trim();
+
+        // Validar que no hay un plato con ese nombre en carta
+        boolean existePlatoCarta = platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaTrue(nombre);
+
+        if (existePlatoCarta) {
+            throw new IllegalArgumentException("El plato '" + nombre + "' ya está en la carta.");
+        }
+
+        // Validar que no hay un plato con ese nombre retirado de carta
+        boolean existePlatoRetiradoCarta = platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaFalseAndEsDelChefFalse(nombre);
+
+        if (existePlatoRetiradoCarta) {
+            throw new IllegalArgumentException("El plato '" + nombre + "' está retirado de la carta. Solicita al dueño que lo vuelva a incluir en carta.");
+        }
+
+        // Validar que el chef no tiene ya un plato creado con ese nombre
+        boolean existePlatoFueraCarta = platoRepository.existsByNombreIgnoreCaseAndEsDelChefTrue(nombre);
+
+        if (existePlatoFueraCarta) {
+            throw new IllegalArgumentException("Ya existe un plato fuera de carta llamado '" + nombre + "'.");
+        }
+
+        // Crear nuevo plato
+        Plato plato = new Plato();
+
+        // Añadir nombre, descripción y categoría
+        plato.setNombre(nombre);
+        plato.setDescripcion(dto.getDescripcion().trim());
+        plato.setCategoria(dto.getCategoria());
+
+        // Los platos del chef no tienen precio propio: se sirven dentro del menú diario
+        plato.setPrecio(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+
+        // Plato fuera de carta creado por el chef
+        plato.setEstaEnCarta(false);
+        plato.setEsDelChef(true);
+
+        return platoRepository.save(plato);
     }
 
     @Override
@@ -83,7 +145,7 @@ public class PlatoServiceImpl implements PlatoService {
         boolean existePlato = platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse(dto.getNombre().trim());
 
         if (existePlato) {
-            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + dto.getNombre().trim() + "'. Si estaba retirado, usa la opción 'Añadir Producto' de la lista de retirados.");
+            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + dto.getNombre().trim() + "' en carta o retirado de ella.");
         }
 
         // Crear nuevo plato
@@ -124,15 +186,70 @@ public class PlatoServiceImpl implements PlatoService {
     }
 
     @Override
+    @Transactional
     public Plato modificarPlato(PlatoModificacionDTO dto) {
-        // TODO (US-16): Buscar plato, actualizar campos y guardar.
-        throw new UnsupportedOperationException("TODO US-16");
+
+        if(dto == null || dto.getIdPlato() == null){
+            throw new IllegalArgumentException("Debes indicar el plato que quieres modificar.");
+        }
+        if(dto.getNombre() == null || dto.getNombre().isBlank()){
+            throw new IllegalArgumentException("El nombre del plato es obligatorio.");
+        }
+        if(dto.getDescripcion() == null || dto.getDescripcion().isBlank()){
+            throw new IllegalArgumentException("La descripcion es obligatoria.");
+        }
+        if (dto.getDescripcion().trim().length() > 255) {
+            throw new IllegalArgumentException("La descripción no puede superar 255 caracteres.");
+        }
+        if(dto.getPrecio() == null || dto.getPrecio().compareTo(new BigDecimal("0.01")) < 0){
+            throw new IllegalArgumentException("El precio del plato debe ser de al menos 0.01.");
+        }
+        if(dto.getPrecio().compareTo(new BigDecimal("999999.99")) > 0){
+            throw new IllegalArgumentException("El precio del plato no puede superar 999999.99.");
+        }
+        if(dto.getCategoria() == null){
+            throw new IllegalArgumentException("Debes seleccionar la categoria del plato.");
+        }
+
+        Plato plato = buscarPorId(dto.getIdPlato());
+
+        // Dueño solo modifica productos de la carta (ni platos de chef ni retirados)
+        if(plato.getEsDelChef()){
+            throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden modificar desde la carta.");
+        }
+        if(!plato.getEstaEnCarta()){
+            throw new IllegalArgumentException("El plato '" + plato.getNombre() + "' no está en la carta.");
+        }
+
+        String nombre = dto.getNombre().trim();
+        if(!nombre.equalsIgnoreCase(plato.getNombre().trim()) && platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse(nombre)){
+            throw new IllegalArgumentException("Ya existe un producto con el nombre '" + nombre + "' en carta o retirado de ella.");
+        }
+
+        plato.setNombre(nombre);
+        plato.setDescripcion(dto.getDescripcion().trim());
+        plato.setPrecio(dto.getPrecio().setScale(2, RoundingMode.HALF_UP));
+        plato.setCategoria(dto.getCategoria());
+
+        return platoRepository.save(plato);
     }
 
     @Override
+    @Transactional 
     public void retirarPlatoDeLaCarta(Long id) {
-        // TODO (US-18): Buscar plato, poner estaEnCarta=false, guardar.
-        throw new UnsupportedOperationException("TODO US-18");
+
+        Plato plato = buscarPorId(id);
+
+        //Solo se retiran productos de la carta (los platos del chef nunca lo están)
+        if(plato.getEsDelChef()){
+            throw new OperacionNoPermitidaException("Los platos creados por el chef no se pueden retirar de la carta.");
+        }
+        if(!plato.getEstaEnCarta()){
+            throw new IllegalArgumentException("El plato '" + plato.getNombre() + "' ya está retirado de la carta.");
+        }
+        
+        plato.setEstaEnCarta(false);
+        platoRepository.save(plato);
     }
 
     @Override

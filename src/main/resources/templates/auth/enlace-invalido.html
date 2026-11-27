@@ -32,7 +32,7 @@
             <div class="card shadow border-0">
                 <div class="card-body text-center p-5">
                     <div class="icono-error">✗</div>
-                    <h2 class="fw-bold mb-3" style="color: #dc3545;">Enlace no válido</h2>
+                    <h1 class="h2 fw-bold mb-3" style="color: #dc3545;">Enlace no válido</h1>
                     <p class="text-muted">El enlace de activación no es válido o ya se ha utilizado.</p>
 
                     <div th:if="${mensajeError}" class="alert alert-danger" th:text="${mensajeError}"></div>
@@ -44,7 +44,7 @@
                         <p class="text-muted mb-2 text-start">Introduce tu login o correo a continuación para enviarte un nuevo enlace</p>
                         <div class="input-group">
                             <input type="text" name="logincorreo" class="form-control" required>
-                            <button type="submit" class="btn btn-secondary">REENVIAR CORREO</button>
+                            <button type="submit" class="btn btn-secondary">Reenviar Correo</button>
                         </div>
                     </form>
 

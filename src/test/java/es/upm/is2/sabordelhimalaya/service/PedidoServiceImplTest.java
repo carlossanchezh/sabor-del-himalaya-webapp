@@ -6,6 +6,8 @@ import es.upm.is2.sabordelhimalaya.dto.response.ResumenPedidoDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaMenu;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.enums.EstadoPedido;
+import es.upm.is2.sabordelhimalaya.dto.session.PedidoTemporalDTO;
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 import es.upm.is2.sabordelhimalaya.model.LineaPedidoMenuDiario;
 import es.upm.is2.sabordelhimalaya.model.LineaPedidoPlato;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +47,10 @@ import static org.mockito.Mockito.*;
  - US-06 (Crear pedido)
  - US-07 (Revisar y confirmar pedido)
  - US-08 (Consultar el estado del pedido)
+ - US-09 (Modificar un pedido)
+ - US-10 (Cancelar un pedido)
+ - US-11 (Cambiar estado de un pedido)
+ - US-19 (Calcular facturación diaria)
  */
 
 @ExtendWith(MockitoExtension.class)
@@ -157,6 +164,13 @@ public class PedidoServiceImplTest {
         return new MenuDiarioOpcion(null, menu, plato, categoria);
     }
 
+    private Pedido pedidoHaceMinutos(long minutos, EstadoPedido estado) {
+
+        Pedido p = pedido(1L, estado, "10.00");
+        p.setUsuario(usuario);
+        p.setFechaHora(LocalDateTime.now().minusMinutes(minutos));
+        return p;
+    }
 
     @Test
     @DisplayName("PU-07-01: resumirPedidoTemporal con un plato devuelve 1 línea")
@@ -497,10 +511,414 @@ public class PedidoServiceImplTest {
         List<Pedido> resultado = pedidoService.listarPedidosDeUsuario(1L);
 
         assertEquals(5, resultado.size());
-        assertEquals(EstadoPedido.RECIBIDO,       resultado.get(0).getEstado());
+        assertEquals(EstadoPedido.RECIBIDO, resultado.get(0).getEstado());
         assertEquals(EstadoPedido.EN_PREPARACION, resultado.get(1).getEstado());
-        assertEquals(EstadoPedido.EN_REPARTO,     resultado.get(2).getEstado());
-        assertEquals(EstadoPedido.ENTREGADO,      resultado.get(3).getEstado());
-        assertEquals(EstadoPedido.CANCELADO,      resultado.get(4).getEstado());
+        assertEquals(EstadoPedido.EN_REPARTO, resultado.get(2).getEstado());
+        assertEquals(EstadoPedido.ENTREGADO, resultado.get(3).getEstado());
+        assertEquals(EstadoPedido.CANCELADO, resultado.get(4).getEstado());
+    }
+
+    @Test
+    @DisplayName("PU-09-01: modificarPedido dentro de los 10 minutos recalcula el importe con las nuevas cantidades")
+    void modificarPedido_dentroDelPlazo_recalculaImporte() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        lineaPlatoDTO.setCantidad(2);
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of());
+
+        assertEquals(new BigDecimal("20.00"), resultado.getImporteTotal());
+        assertEquals(EstadoPedido.RECIBIDO, resultado.getEstado());
+    }
+
+    @Test
+    @DisplayName("PU-09-02: modificarPedido con un menú del día recalcula el importe")
+    void modificarPedido_conMenu_recalculaImporte() {
+
+        prepararMenu();
+        Pedido pedido = pedidoHaceMinutos(1, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        lineaMenuDTO.setCantidad(2);
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(), List.of(lineaMenuDTO));
+
+        assertEquals(new BigDecimal("30.00"), resultado.getImporteTotal());
+    }
+
+    @Test
+    @DisplayName("PU-09-03: modificarPedido pasados los 10 minutos lanza OperacionNoPermitida y no guarda nada")
+    void modificarPedido_fueraDelPlazo_lanzaOperacionNoPermitida() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(11, EstadoPedido.RECIBIDO)));
+
+        assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+
+        verify(pedidoRepository, never()).save(any());
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-04: modificarPedido de un pedido cancelado lanza OperacionNoPermitida")
+    void modificarPedido_cancelado_lanzaOperacionNoPermitida() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.CANCELADO)));
+
+        assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+    }
+
+    @Test
+    @DisplayName("PU-09-05: modificarPedido dejando el pedido vacío lanza IllegalArgumentException")
+    void modificarPedido_vacio_lanzaError() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(), List.of()));
+
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-06: modificarPedido con un plato retirado lanza IllegalArgumentException sin borrar las líneas")
+    void modificarPedido_platoRetirado_lanzaErrorSinBorrar() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+        when(platoRepository.findById(20L)).thenReturn(Optional.of(platoRetirado));
+
+        lineaPlatoDTO.setIdPlato(20L);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-07: modificarPedido con pedido inexistente lanza RecursoNoEncontrado")
+    void modificarPedido_noExiste_lanzaRecursoNoEncontrado() {
+
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> pedidoService.modificarPedido(99L, List.of(lineaPlatoDTO), List.of()));
+    }
+
+    @Test
+    @DisplayName("PU-09-08: modificarPedido con plato y menú suma ambos importes")
+    void modificarPedido_platoYMenu_sumaImportes() {
+
+        prepararMenu();
+        Pedido pedido = pedidoHaceMinutos(2, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of(lineaMenuDTO));
+
+        assertEquals(new BigDecimal("25.00"), resultado.getImporteTotal());
+    }
+
+    @Test
+    @DisplayName("PU-09-09: modificarPedido no cambia la fecha, el estado ni el usuario del pedido")
+    void modificarPedido_noCambiaFechaEstadoNiUsuario() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        LocalDateTime fechaOriginal = pedido.getFechaHora();
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entrante));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Pedido resultado = pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of());
+
+        assertEquals(fechaOriginal, resultado.getFechaHora());
+        assertEquals(EstadoPedido.RECIBIDO, resultado.getEstado());
+        assertSame(usuario, resultado.getUsuario());
+    }
+
+    @Test
+    @DisplayName("PU-09-10: modificarPedido con un menú que no es de hoy lanza IllegalArgumentException sin borrar las líneas")
+    void modificarPedido_menuNoEsDeHoy_lanzaErrorSinBorrar() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+        when(menuDiarioRepository.findById(2L)).thenReturn(Optional.of(menuAyer));
+
+        lineaMenuDTO.setIdMenuDiario(2L);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(), List.of(lineaMenuDTO)));
+
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+        verify(lineaPedidoMenuDiarioRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-11: modificarPedido con cantidad 0 lanza IllegalArgumentException sin borrar las líneas")
+    void modificarPedido_cantidadCero_lanzaErrorSinBorrar() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.RECIBIDO)));
+
+        lineaPlatoDTO.setCantidad(0);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.modificarPedido(1L, List.of(lineaPlatoDTO), List.of()));
+
+        verify(lineaPedidoPlatoRepository, never()).deleteAll(any());
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-09-12: sePuedeModificar es true a los 9 minutos y false a los 11")
+    void sePuedeModificar_limiteDeDiezMinutos() {
+
+        assertTrue(pedidoService.sePuedeModificar(pedidoHaceMinutos(9, EstadoPedido.RECIBIDO)));
+        assertFalse(pedidoService.sePuedeModificar(pedidoHaceMinutos(11, EstadoPedido.RECIBIDO)));
+    }
+
+    @Test
+    @DisplayName("PU-09-13: sePuedeModificar es false si el pedido está cancelado, aunque esté dentro del plazo")
+    void sePuedeModificar_cancelado_devuelveFalse() {
+
+        assertFalse(pedidoService.sePuedeModificar(pedidoHaceMinutos(2, EstadoPedido.CANCELADO)));
+    }
+
+    @Test
+    @DisplayName("PU-09-14: sePuedeModificar es false si el pedido no tiene fecha")
+    void sePuedeModificar_sinFecha_devuelveFalse() {
+
+        assertFalse(pedidoService.sePuedeModificar(pedido(1L, EstadoPedido.RECIBIDO, "10.00")));
+    }
+
+    @Test
+    @DisplayName("PU-09-15: obtenerLineasDePedido con pedido inexistente lanza RecursoNoEncontrado")
+    void obtenerLineasDePedido_noExiste_lanzaRecursoNoEncontrado() {
+
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> pedidoService.obtenerLineasDePedido(99L));
+    }
+
+    @Test
+    @DisplayName("PU-10-01: cancelarPedido dentro de los 10 minutos pasa el pedido a CANCELADO sin borrar nada")
+    void cancelarPedido_dentroDelPlazo_pasaACancelado() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        LocalDateTime fechaOriginal = pedido.getFechaHora();
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+        pedidoService.cancelarPedido(1L);
+
+        assertEquals(EstadoPedido.CANCELADO, pedido.getEstado());
+        verify(pedidoRepository).save(pedido);
+
+        // El pedido se conserva (historial): ni se borra, ni cambian su importe, fecha o líneas
+        verify(pedidoRepository, never()).delete(any());
+        verify(pedidoRepository, never()).deleteById(any());
+        verifyNoInteractions(lineaPedidoPlatoRepository, lineaPedidoMenuDiarioRepository);
+        assertEquals(new BigDecimal("10.00"), pedido.getImporteTotal());
+        assertEquals(fechaOriginal, pedido.getFechaHora());
+    }
+
+    @Test
+    @DisplayName("PU-10-02: cancelarPedido pasados los 10 minutos lanza OperacionNoPermitida y no cambia el estado")
+    void cancelarPedido_fueraDelPlazo_lanzaErrorSinCancelar() {
+
+        Pedido pedido = pedidoHaceMinutos(11, EstadoPedido.RECIBIDO);
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+
+        OperacionNoPermitidaException ex = assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.cancelarPedido(1L));
+
+        assertTrue(ex.getMessage().contains("10 minutos"));
+        assertEquals(EstadoPedido.RECIBIDO, pedido.getEstado());
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-10-03: cancelarPedido sobre un pedido ya cancelado impide cancelar y no guarda")
+    void cancelarPedido_yaCancelado_lanzaError() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(2, EstadoPedido.CANCELADO)));
+
+        OperacionNoPermitidaException ex = assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.cancelarPedido(1L));
+
+        assertTrue(ex.getMessage().contains("ya está cancelado"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-10-04: cancelarPedido sobre un pedido cancelado y fuera de plazo indica que ya está cancelado")
+    void cancelarPedido_canceladoYFueraDePlazo_indicaQueYaEstaCancelado() {
+
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedidoHaceMinutos(30, EstadoPedido.CANCELADO)));
+
+        OperacionNoPermitidaException ex = assertThrows(OperacionNoPermitidaException.class,
+                () -> pedidoService.cancelarPedido(1L));
+
+        assertTrue(ex.getMessage().contains("ya está cancelado"));
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-10-05: cancelarPedido con pedido inexistente lanza RecursoNoEncontrado y no guarda")
+    void cancelarPedido_pedidoNoExiste_lanzaRecursoNoEncontrado() {
+
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class, () -> pedidoService.cancelarPedido(99L));
+
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-11-01: cambiarEstado guarda el nuevo estado del pedido")
+    void cambiarEstado_pedidoExistente_guardaNuevoEstado() {
+
+        Pedido pedido = pedido(1L, EstadoPedido.RECIBIDO, "10.00");
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Pedido resultado = pedidoService.cambiarEstado(1L, EstadoPedido.EN_PREPARACION);
+
+        assertEquals(EstadoPedido.EN_PREPARACION, resultado.getEstado());
+        verify(pedidoRepository).save(pedido);
+    }
+
+    @Test
+    @DisplayName("PU-11-02: cambiarEstado acepta todos los estados (Recibido, En preparación, En reparto, Entregado y Cancelado)")
+    void cambiarEstado_cualquierEstado_loGuarda() {
+
+        Pedido pedido = pedido(1L, EstadoPedido.RECIBIDO, "10.00");
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        for (EstadoPedido estado : EstadoPedido.values()) {
+            assertEquals(estado, pedidoService.cambiarEstado(1L, estado).getEstado());
+        }
+    }
+
+    @Test
+    @DisplayName("PU-11-03: cambiarEstado sin nuevo estado lanza IllegalArgumentException y no toca el repositorio")
+    void cambiarEstado_estadoNulo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> pedidoService.cambiarEstado(1L, null));
+
+        verifyNoInteractions(pedidoRepository);
+    }
+
+    @Test
+    @DisplayName("PU-11-04: cambiarEstado con pedido inexistente lanza RecursoNoEncontrado y no guarda")
+    void cambiarEstado_pedidoNoExiste_lanzaRecursoNoEncontrado() {
+
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> pedidoService.cambiarEstado(99L, EstadoPedido.ENTREGADO));
+
+        verify(pedidoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-11-05: cambiarEstado solo cambia el estado (importe, fecha y usuario no varían)")
+    void cambiarEstado_soloCambiaElEstado() {
+
+        Pedido pedido = pedidoHaceMinutos(5, EstadoPedido.RECIBIDO);
+        LocalDateTime fechaOriginal = pedido.getFechaHora();
+        when(pedidoRepository.findById(1L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Pedido resultado = pedidoService.cambiarEstado(1L, EstadoPedido.EN_REPARTO);
+
+        assertEquals(new BigDecimal("10.00"), resultado.getImporteTotal());
+        assertEquals(fechaOriginal, resultado.getFechaHora());
+        assertSame(usuario, resultado.getUsuario());
+    }
+
+    @Test
+    @DisplayName("PU-11-06: listarPedidosDelDia consulta el rango del día completo (00:00 a 00:00 del día siguiente)")
+    void listarPedidosDelDia_devuelvePedidosDelRangoDelDia() {
+
+        LocalDate fecha = LocalDate.of(2026, 10, 22);
+        List<Pedido> pedidos = List.of(pedido(1L, EstadoPedido.RECIBIDO, "10.00"), pedido(2L, EstadoPedido.ENTREGADO, "20.00"));
+        when(pedidoRepository.findByFechaHoraBetween(fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay()))
+                .thenReturn(pedidos);
+
+        assertEquals(pedidos, pedidoService.listarPedidosDelDia(fecha));
+    }
+
+    @Test
+    @DisplayName("PU-11-07: listarPedidosDelDia sin pedidos devuelve lista vacía")
+    void listarPedidosDelDia_sinPedidos_devuelveListaVacia() {
+
+        assertTrue(pedidoService.listarPedidosDelDia(LocalDate.of(2026, 10, 22)).isEmpty());
+    }
+
+    @Test
+    @DisplayName("PU-11-08: listarPedidosDelDia sin fecha lanza IllegalArgumentException y no consulta")
+    void listarPedidosDelDia_fechaNula_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> pedidoService.listarPedidosDelDia(null));
+
+        verifyNoInteractions(pedidoRepository);
+    }
+
+    @Test
+    @DisplayName("PU-19-01: calcularFacturacion suma el importe de los pedidos entregados del día")
+    void calcularFacturacion_variosPedidos_sumaImportes() {
+
+        LocalDate fecha = LocalDate.of(2026, 10, 22);
+        when(pedidoRepository.findByEstadoAndFechaHoraBetween(EstadoPedido.ENTREGADO, fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay()))
+                .thenReturn(List.of(
+                        pedido(1L, EstadoPedido.ENTREGADO, "10.00"),
+                        pedido(2L, EstadoPedido.ENTREGADO, "25.50"),
+                        pedido(3L, EstadoPedido.ENTREGADO, "4.25")));
+
+        assertEquals(new BigDecimal("39.75"), pedidoService.calcularFacturacion(fecha));
+    }
+
+    @Test
+    @DisplayName("PU-19-02: calcularFacturacion de un día sin pedidos entregados devuelve 0,00")
+    void calcularFacturacion_sinPedidos_devuelveCero() {
+
+        assertEquals(new BigDecimal("0.00"), pedidoService.calcularFacturacion(LocalDate.of(2026, 10, 22)));
+    }
+
+    @Test
+    @DisplayName("PU-19-03: calcularFacturacion consulta solo pedidos ENTREGADO y el rango del día completo")
+    void calcularFacturacion_consultaSoloEntregadosDelDia() {
+
+        LocalDate fecha = LocalDate.of(2026, 10, 31);
+
+        pedidoService.calcularFacturacion(fecha);
+
+        verify(pedidoRepository).findByEstadoAndFechaHoraBetween(EstadoPedido.ENTREGADO, fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
+        verifyNoMoreInteractions(pedidoRepository);
+    }
+
+    @Test
+    @DisplayName("PU-19-04: calcularFacturacion devuelve el total con 2 decimales")
+    void calcularFacturacion_importesSinDecimales_devuelveDosDecimales() {
+
+        LocalDate fecha = LocalDate.of(2026, 10, 22);
+        when(pedidoRepository.findByEstadoAndFechaHoraBetween(EstadoPedido.ENTREGADO, fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay()))
+                .thenReturn(List.of(pedido(1L, EstadoPedido.ENTREGADO, "10"), pedido(2L, EstadoPedido.ENTREGADO, "5.5")));
+
+        assertEquals(new BigDecimal("15.50"), pedidoService.calcularFacturacion(fecha));
+    }
+
+    @Test
+    @DisplayName("PU-19-05: calcularFacturacion sin fecha lanza IllegalArgumentException y no consulta")
+    void calcularFacturacion_fechaNula_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> pedidoService.calcularFacturacion(null));
+
+        verifyNoInteractions(pedidoRepository);
     }
 }

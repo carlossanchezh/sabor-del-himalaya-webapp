@@ -1,6 +1,7 @@
 package es.upm.is2.sabordelhimalaya.config;
 
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -56,6 +58,11 @@ public class SecurityConfig {
                 )
                 .logout(logout -> logout
                         .logoutUrl("/auth/logout") //pantalla logout
+                        .addLogoutHandler((request, response, authentication) -> {
+                            if (authentication != null) {
+                                log.info("Cierre de sesión: '{}'", authentication.getName());
+                            }
+                        })
                         .logoutSuccessUrl("/auth/login?logout") // a la pantalla de login despues de logout
                         .permitAll()
                 );
@@ -67,6 +74,9 @@ public class SecurityConfig {
     public AuthenticationSuccessHandler customSuccessHandler() {
         return (request, response, authentication) -> {
             String role = authentication.getAuthorities().iterator().next().getAuthority();
+
+            log.info("Inicio de sesión: '{}' ({})", authentication.getName(), role);
+
             switch (role) {
                 case "ROLE_CHEF" -> response.sendRedirect("/chef/carta");
                 case "ROLE_STAFF" -> response.sendRedirect("/staff/pedidos");

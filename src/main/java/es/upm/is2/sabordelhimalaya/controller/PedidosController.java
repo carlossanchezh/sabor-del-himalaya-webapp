@@ -22,6 +22,9 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +53,9 @@ public class PedidosController {
 
     // Máximo de unidades por línea de pedido
     private static final int MAX_CANTIDAD = 99;
+
+    // Minutos tras la realización del pedido durante los que se puede modificar
+    private static final int MINUTOS_MODIFICACION = 10;
 
     private final PedidoService pedidoService;
     private final UsuarioService usuarioService;
@@ -317,34 +323,176 @@ public class PedidosController {
 
         model.addAttribute("resumenesPedidos", resumenesPedidos);
 
+        // Pedidos que todavía se pueden modificar y segundos que les quedan
+        Map<Long, Long> modificables = new HashMap<>();
+        for (Pedido pedido : pedidos) {
+            if (pedidoService.sePuedeModificar(pedido)) {
+                modificables.put(pedido.getIdPedido(), segundosRestantes(pedido));
+            }
+        }
+
+        model.addAttribute("modificables", modificables);
+
         return "pedidos/mis-pedidos";
     }
 
-
     @GetMapping("/{id}/modificar")
-    public String mostrarEditarPedido(@PathVariable Long id) {
-        // TODO (US-09): Cargar pedido y pasarlo a la vista.
-        // TODO (P11): Crear HTML
-        // P11: Modificar un pedido
-        // Formulario para editar un pedido (solo dentro de los 10 min)
+    public String mostrarEditarPedido(@PathVariable Long id, Authentication authentication, Model model, RedirectAttributes redirectAttributes) {
+
+        // Se obtiene el pedido y se comprueba que es del usuario logueado
+        Pedido pedido = pedidoDelUsuario(id, authentication);
+
+        // Pasados los 10 minutos no se puede modificar
+        if (!pedidoService.sePuedeModificar(pedido)) {
+            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+            return "redirect:/pedidos/mis-pedidos";
+        }
+
+        // Resumen de las líneas actuales del pedido (con el mismo orden que el formulario)
+        PedidoTemporalDTO lineas = pedidoService.obtenerLineasDePedido(id);
+        ResumenPedidoDTO resumen;
+
+        try {
+
+            resumen = pedidoService.resumirPedidoTemporal(lineas.getLineasPlato(), lineas.getLineasMenu());
+
+        } catch (IllegalArgumentException e) {
+
+            // Algún producto del pedido ya no está disponible (p. ej. el dueño lo ha retirado de la carta)
+            redirectAttributes.addFlashAttribute("error", "No se puede modificar el pedido #" + id + ": " + e.getMessage());
+            return "redirect:/pedidos/mis-pedidos";
+        }
+
+        model.addAttribute("pedido", pedido);
+        model.addAttribute("resumen", resumen);
+        model.addAttribute("segundosRestantes", segundosRestantes(pedido));
+        model.addAttribute("maxCantidad", MAX_CANTIDAD);
+        model.addAttribute("minutosModificacion", MINUTOS_MODIFICACION);
+
         return "pedidos/modificar";
     }
 
-
     @PostMapping("/{id}/modificar")
-    public String guardarEdicionPedido(@PathVariable Long id) {
-        // TODO (US-09): Llamar a PedidoService.modificarPedido(...).
-        // Guardar los cambios del pedido
+    public String guardarEdicionPedido(@PathVariable Long id, @RequestParam(required = false) List<Integer> cantidadesPlato, @RequestParam(required = false) List<Integer> cantidadesMenu, Authentication authentication, RedirectAttributes redirectAttributes) {
+
+        // Se obtiene el pedido y se comprueba que es del usuario logueado
+        Pedido pedido = pedidoDelUsuario(id, authentication);
+
+        // Pasados los 10 minutos no se puede modificar
+        if (!pedidoService.sePuedeModificar(pedido)) {
+            redirectAttributes.addFlashAttribute("error", "El pedido #" + id + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+            return "redirect:/pedidos/mis-pedidos";
+        }
+
+        // Líneas actuales del pedido
+        PedidoTemporalDTO lineas = pedidoService.obtenerLineasDePedido(id);
+        List<LineaPedidoPlatoDTO> platos = lineas.getLineasPlato();
+        List<LineaPedidoMenuDiarioDTO> menus = lineas.getLineasMenu();
+
+        int numPlatos = (cantidadesPlato != null) ? cantidadesPlato.size() : 0;
+        int numMenus = (cantidadesMenu != null) ? cantidadesMenu.size() : 0;
+
+        // El número de cantidades recibidas debe coincidir con las líneas del pedido y ninguna puede faltar
+        if (numPlatos != platos.size() || numMenus != menus.size() || (cantidadesPlato != null && cantidadesPlato.contains(null)) || (cantidadesMenu != null && cantidadesMenu.contains(null))) {
+            redirectAttributes.addFlashAttribute("error", "No se han podido guardar los cambios. Revisa las cantidades e inténtalo de nuevo.");
+            return "redirect:/pedidos/" + id + "/modificar";
+        }
+
+        // Cantidades entre 0 (quitar el producto) y 99
+        if ((cantidadesPlato != null && cantidadesPlato.stream().anyMatch(c -> c < 0 || c > MAX_CANTIDAD)) || (cantidadesMenu != null && cantidadesMenu.stream().anyMatch(c -> c < 0 || c > MAX_CANTIDAD))) {
+            redirectAttributes.addFlashAttribute("error", "La cantidad de cada producto debe ser entre 0 y " + MAX_CANTIDAD + " unidades.");
+            return "redirect:/pedidos/" + id + "/modificar";
+        }
+
+        // Se asignan las nuevas cantidades y se quitan las líneas que quedan a 0
+        for (int i = 0; i < numPlatos; i++) {
+            platos.get(i).setCantidad(cantidadesPlato.get(i));
+        }
+        for (int i = 0; i < numMenus; i++) {
+            menus.get(i).setCantidad(cantidadesMenu.get(i));
+        }
+
+        platos.removeIf(linea -> linea.getCantidad() < 1);
+        menus.removeIf(linea -> linea.getCantidad() < 1);
+
+        BigDecimal importeAnterior = pedido.getImporteTotal();
+        Pedido pedidoModificado;
+
+        try {
+
+            // Se guardan los cambios y se recalcula el importe
+            pedidoModificado = pedidoService.modificarPedido(id, platos, menus);
+
+        } catch (IllegalArgumentException e) {
+
+            // Pedido vacío o algún producto ya no disponible
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/pedidos/" + id + "/modificar";
+
+        } catch (OperacionNoPermitidaException e) {
+
+            // El plazo ha terminado mientras el usuario editaba
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/pedidos/mis-pedidos";
+        }
+
+        log.info("Pedido #{} modificado por usuario='{}' ({} € -> {} €)", id, authentication.getName(), importeAnterior, pedidoModificado.getImporteTotal());
+
+        // Se informa del nuevo importe; "Mis pedidos" muestra los nuevos productos
+        redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " modificado correctamente. Nuevo importe: " + pedidoModificado.getImporteTotal().toPlainString().replace('.', ',') + " €");
+
         return "redirect:/pedidos/mis-pedidos";
     }
 
-
     @PostMapping("/{id}/cancelar")
-    public String cancelarPedido(@PathVariable Long id) {
-        // TODO (US-10): Llamar a PedidoService.cancelarPedido(id).
-        // Cancelar el pedido
-        // TODO (P12): Crear HTML
-        // P12: Pop up dentro de pantalla 10 para confirmar si se desea eliminar el pedido
+    public String cancelarPedido(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+
+        // Solo el dueño del pedido puede eliminarlo
+        pedidoDelUsuario(id, authentication);
+
+        try {
+
+            pedidoService.cancelarPedido(id);
+
+            log.info("Pedido #{} cancelado por el usuario '{}'", id, authentication.getName());
+
+            redirectAttributes.addFlashAttribute("mensaje", "Pedido #" + id + " cancelado correctamente.");
+
+        } catch (OperacionNoPermitidaException e) {
+
+            // Plazo de 10 minutos agotado o pedido ya cancelado
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
+
         return "redirect:/pedidos/mis-pedidos";
+    }
+
+    // ----------------------------------------------------------------
+    // Métodos auxiliares
+    // ----------------------------------------------------------------
+
+    // Devuelve el pedido si pertenece al usuario logueado (403 si es de otro usuario, 404 si no existe)
+    private Pedido pedidoDelUsuario(Long idPedido, Authentication authentication) {
+
+        Usuario usuario = usuarioService.buscarPorLogin(authentication.getName());
+        Pedido pedido = pedidoService.buscarPorId(idPedido);
+
+        if (pedido.getUsuario() == null || !Objects.equals(pedido.getUsuario().getIdUsuario(), usuario.getIdUsuario())) {
+            throw new OperacionNoPermitidaException("No puedes acceder a un pedido de otro usuario.");
+        }
+
+        return pedido;
+    }
+
+    // Segundos que quedan para poder modificar el pedido (0 si ya no se puede)
+    private long segundosRestantes(Pedido pedido) {
+
+        if (!pedidoService.sePuedeModificar(pedido)) {
+            return 0;
+        }
+
+        LocalDateTime limite = pedido.getFechaHora().plusMinutes(MINUTOS_MODIFICACION);
+
+        return Math.max(0, Duration.between(LocalDateTime.now(), limite).getSeconds());
     }
 }

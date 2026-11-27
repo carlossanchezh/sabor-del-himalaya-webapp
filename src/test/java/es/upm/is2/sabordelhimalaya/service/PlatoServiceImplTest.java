@@ -1,6 +1,7 @@
 package es.upm.is2.sabordelhimalaya.service;
 
 import es.upm.is2.sabordelhimalaya.dto.request.PlatoCreacionDTO;
+import es.upm.is2.sabordelhimalaya.dto.request.PlatoModificacionDTO;
 import es.upm.is2.sabordelhimalaya.enums.CategoriaPlato;
 import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
@@ -29,7 +30,10 @@ import static org.mockito.Mockito.*;
  - US-04 (Cliente ver carta)
  - US-12 (Chef ver carta)
  - US-15 (Dueño ver carta)
+ - US-14 (Chef crear plato fuera de carta)
  - US-17 (Dueño añadir plato)
+ - US-16 (Dueño modificar plato)
+ - US-18 (Dueño retirar plato)
  */
 
 @ExtendWith(MockitoExtension.class)
@@ -94,6 +98,17 @@ class PlatoServiceImplTest {
         PlatoCreacionDTO dto = new PlatoCreacionDTO();
         dto.setNombre(nombre);
         dto.setDescripcion(descripcion);
+        dto.setPrecio(precio != null ? new BigDecimal(precio) : null);
+        dto.setCategoria(categoria);
+        return dto;
+    }
+
+    private PlatoModificacionDTO dtoModificacion(Long id, String nombre, String precio, CategoriaPlato categoria) {
+
+        PlatoModificacionDTO dto = new PlatoModificacionDTO();
+        dto.setIdPlato(id);
+        dto.setNombre(nombre);
+        dto.setDescripcion("Descripción nueva");
         dto.setPrecio(precio != null ? new BigDecimal(precio) : null);
         dto.setCategoria(categoria);
         return dto;
@@ -331,6 +346,28 @@ class PlatoServiceImplTest {
     }
 
     @Test
+    @DisplayName("PU-17-04-03: Rechaza un precio que redondeado quedaría en 0 (0.004)")
+    void anadirPlatoALaCarta_precioMenorDeUnCentimo_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Lassi", "Bebida de yogur", "0.004", CategoriaPlato.BEBIDA);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
+        assertTrue(ex.getMessage().contains("precio"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-17-04-04: Rechaza un precio mayor que el máximo de la columna DECIMAL(8,2)")
+    void anadirPlatoALaCarta_precioDemasiadoAlto_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Lassi", "Bebida de yogur", "1000000.00", CategoriaPlato.BEBIDA);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.anadirPlatoALaCarta(dto));
+        assertTrue(ex.getMessage().contains("precio"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("PU-17-05-01: Rechaza el plato si el nombre ya existe")
     void anadirPlatoALaCarta_nombreDuplicado_lanzaError() {
 
@@ -436,5 +473,381 @@ class PlatoServiceImplTest {
 
         assertEquals(retirados, resultado);
         verify(platoRepository).findByEstaEnCartaFalseAndEsDelChefFalse();
+    }
+
+    @Test
+    @DisplayName("PU-14-01: Plato válido se guarda fuera de carta, del chef y con precio 0")
+    void crearPlatoFueraDeCarta_valido_guardaPlatoDelChef() {
+
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Plato resultado = platoService.crearPlatoFueraDeCarta(dtoValido);
+
+        ArgumentCaptor<Plato> captor = ArgumentCaptor.forClass(Plato.class);
+        verify(platoRepository).save(captor.capture());
+        Plato guardado = captor.getValue();
+
+        assertSame(guardado, resultado);
+        assertEquals("Plato 5", guardado.getNombre());
+        assertEquals("Descripción 5", guardado.getDescripcion());
+        assertEquals(CategoriaPlato.ENTRANTE, guardado.getCategoria());
+        assertEquals(new BigDecimal("0.00"), guardado.getPrecio());
+        assertFalse(guardado.getEstaEnCarta());
+        assertTrue(guardado.getEsDelChef());
+    }
+
+    @Test
+    @DisplayName("PU-14-02: Quita los espacios del nombre y la descripción")
+    void crearPlatoFueraDeCarta_limpiaEspacios() {
+
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PlatoCreacionDTO conEspacios = dto("  Crema de calabaza  ", "  Con jengibre  ", null, CategoriaPlato.PRINCIPAL);
+
+        Plato resultado = platoService.crearPlatoFueraDeCarta(conEspacios);
+
+        assertEquals("Crema de calabaza", resultado.getNombre());
+        assertEquals("Con jengibre", resultado.getDescripcion());
+        assertEquals(new BigDecimal("0.00"), resultado.getPrecio());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-01: Rechaza el plato si el nombre está vacío")
+    void crearPlatoFueraDeCarta_nombreVacio_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("   ", "Descripción", null, CategoriaPlato.POSTRE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("nombre"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-02: Rechaza el plato si la descripción está vacía")
+    void crearPlatoFueraDeCarta_descripcionVacia_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Plato 8", "", null, CategoriaPlato.POSTRE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("descripción"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-03: Rechaza un nombre de más de 120 caracteres")
+    void crearPlatoFueraDeCarta_nombreDemasiadoLargo_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("a".repeat(121), "Descripción", null, CategoriaPlato.PRINCIPAL);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("120"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-04: Rechaza una descripción de más de 255 caracteres")
+    void crearPlatoFueraDeCarta_descripcionDemasiadoLarga_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Plato 8", "b".repeat(256), null, CategoriaPlato.PRINCIPAL);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("255"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-03-05: Rechaza el plato si no tiene categoría")
+    void crearPlatoFueraDeCarta_sinCategoria_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Plato 9", "Descripción", null, null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("categoría"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-04: Rechaza una bebida (el menú diario solo tiene entrantes, principales y postres)")
+    void crearPlatoFueraDeCarta_bebida_lanzaError() {
+
+        PlatoCreacionDTO dto = dto("Zumo", "Natural", null, CategoriaPlato.BEBIDA);
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-05: Rechaza un nombre que el chef ya usa (se comprueba con el nombre sin espacios)")
+    void crearPlatoFueraDeCarta_nombreRepetidoDelChef_lanzaError() {
+
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefTrue("Entrante del Chef")).thenReturn(true);
+
+        PlatoCreacionDTO dto = dto("  Entrante del Chef ", "Otra descripción", null, CategoriaPlato.ENTRANTE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("Ya existe"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-06: Rechaza un nombre que ya está en la carta")
+    void crearPlatoFueraDeCarta_nombreIgualAPlatoDeCarta_lanzaError() {
+
+        when(platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaTrue("Entrante Carta")).thenReturn(true);
+
+        PlatoCreacionDTO dto = dto("Entrante Carta", "Versión del chef", null, CategoriaPlato.ENTRANTE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("ya está en la carta"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-07: Rechaza un nombre que coincide con un plato retirado de la carta")
+    void crearPlatoFueraDeCarta_nombreIgualAPlatoRetirado_lanzaError() {
+
+        when(platoRepository.existsByNombreIgnoreCaseAndEstaEnCartaFalseAndEsDelChefFalse("Entrante Retirado")).thenReturn(true);
+
+        PlatoCreacionDTO dto = dto("Entrante Retirado", "Versión del chef", null, CategoriaPlato.ENTRANTE);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(dto));
+        assertTrue(ex.getMessage().contains("retirado"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-08: Rechaza la petición si no llegan datos")
+    void crearPlatoFueraDeCarta_dtoNulo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.crearPlatoFueraDeCarta(null));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-14-09: listarPlatosDelChef devuelve los platos creados por el chef")
+    void listarPlatosDelChef_devuelveLosDelRepositorio() {
+
+        List<Plato> delChef = List.of(entranteDelChef, principalDelChef, postreDelChef);
+        when(platoRepository.findByEsDelChefTrue()).thenReturn(delChef);
+
+        List<Plato> resultado = platoService.listarPlatosDelChef();
+
+        assertEquals(delChef, resultado);
+        verify(platoRepository).findByEsDelChefTrue();
+    }
+
+    @Test
+    @DisplayName("PU-16-01: modificarPlato modifica nombre, descripción, precio y categoría de un plato de la carta")
+    void modificarPlato_valido_actualizaLosDatos() {
+
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entranteEnCarta));
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse("Momos")).thenReturn(false);
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Plato resultado = platoService.modificarPlato(dtoModificacion(10L, "  Momos  ", "12.345", CategoriaPlato.PRINCIPAL));
+
+        assertEquals("Momos", resultado.getNombre());
+        assertEquals("Descripción nueva", resultado.getDescripcion());
+        assertEquals(new BigDecimal("12.35"), resultado.getPrecio());
+        assertEquals(CategoriaPlato.PRINCIPAL, resultado.getCategoria());
+        assertTrue(resultado.getEstaEnCarta());
+        assertFalse(resultado.getEsDelChef());
+        verify(platoRepository).save(entranteEnCarta);
+    }
+
+    @Test
+    @DisplayName("PU-16-02: modificarPlato modifica una bebida de la carta")
+    void modificarPlato_bebida_actualizaLosDatos() {
+
+        when(platoRepository.findById(13L)).thenReturn(Optional.of(bebidaEnCarta));
+        when(platoRepository.save(any(Plato.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Plato resultado = platoService.modificarPlato(dtoModificacion(13L, "Bebida Carta", "2.50", CategoriaPlato.BEBIDA));
+
+        assertEquals(new BigDecimal("2.50"), resultado.getPrecio());
+        assertEquals(CategoriaPlato.BEBIDA, resultado.getCategoria());
+    }
+
+    @Test
+    @DisplayName("PU-16-03: modificarPlato rechaza cambiar el nombre por el de otro producto de la carta o retirado")
+    void modificarPlato_nombreDuplicado_lanzaError() {
+
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entranteEnCarta));
+        when(platoRepository.existsByNombreIgnoreCaseAndEsDelChefFalse("Postre Carta")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "Postre Carta", "10.00", CategoriaPlato.ENTRANTE)));
+        assertTrue(ex.getMessage().contains("Ya existe"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-04-01: modificarPlato rechaza un precio menor de 0,01")
+    void modificarPlato_precioMenorDeUnCentimo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "Momos", "0.004", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-04-02: modificarPlato rechaza un precio mayor que el máximo de la columna DECIMAL(8,2)")
+    void modificarPlato_precioDemasiadoAlto_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "Momos", "1000000.00", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-05: modificarPlato rechaza modificar un plato del chef")
+    void modificarPlato_delChef_lanzaOperacionNoPermitida() {
+
+        when(platoRepository.findById(30L)).thenReturn(Optional.of(entranteDelChef));
+
+        assertThrows(OperacionNoPermitidaException.class,
+                () -> platoService.modificarPlato(dtoModificacion(30L, "Momos", "10.00", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-06: modificarPlato rechaza modificar un plato retirado de la carta")
+    void modificarPlato_retirado_lanzaError() {
+
+        when(platoRepository.findById(20L)).thenReturn(Optional.of(entranteRetirado));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(20L, "Momos", "10.00", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-07: modificarPlato lanza RecursoNoEncontrado si el plato no existe")
+    void modificarPlato_inexistente_lanzaRecursoNoEncontrado() {
+
+        when(platoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> platoService.modificarPlato(dtoModificacion(99L, "Momos", "10.00", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-08: modificarPlato rechaza la petición si no llegan datos")
+    void modificarPlato_dtoNulo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.modificarPlato(null));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-09-01: Rechaza un nombre vacío o null")
+    void modificarPlato_nombreVacio_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "   ", "10.00", CategoriaPlato.ENTRANTE)));
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, null, "10.00", CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-10-02: Rechaza una descripción vacía o null")
+    void modificarPlato_descripcionVacia_lanzaError() {
+
+        PlatoModificacionDTO vacia = dtoModificacion(10L, "Momos", "10.00", CategoriaPlato.ENTRANTE);
+        vacia.setDescripcion("  ");
+        PlatoModificacionDTO nula = dtoModificacion(10L, "Momos", "10.00", CategoriaPlato.ENTRANTE);
+        nula.setDescripcion(null);
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.modificarPlato(vacia));
+        assertThrows(IllegalArgumentException.class, () -> platoService.modificarPlato(nula));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-09-03: Rechaza una descripción de más de 255 caracteres")
+    void modificarPlato_descripcionDemasiadoLarga_lanzaError() {
+
+        PlatoModificacionDTO dto = dtoModificacion(10L, "Momos", "10.00", CategoriaPlato.ENTRANTE);
+        dto.setDescripcion("b".repeat(256));
+
+        assertThrows(IllegalArgumentException.class, () -> platoService.modificarPlato(dto));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-09-04: Rechaza la modificación si no tiene categoría")
+    void modificarPlato_sinCategoria_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "Momos", "10.00", null)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-16-09-05: Rechaza la modificación si no tiene precio")
+    void modificarPlato_precioNulo_lanzaError() {
+
+        assertThrows(IllegalArgumentException.class,
+                () -> platoService.modificarPlato(dtoModificacion(10L, "Momos", null, CategoriaPlato.ENTRANTE)));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-18-01: Retira un plato de la carta sin borrarlo de la base de datos")
+    void retirarPlato_enCarta_quedaRetirado() {
+
+        when(platoRepository.findById(10L)).thenReturn(Optional.of(entranteEnCarta));
+
+        platoService.retirarPlatoDeLaCarta(10L);
+
+        assertFalse(entranteEnCarta.getEstaEnCarta());
+        verify(platoRepository).save(entranteEnCarta);
+        verify(platoRepository, never()).delete(any());
+        verify(platoRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("PU-18-02: Retira una bebida de la carta")
+    void retirarPlato_bebida_quedaRetirada() {
+
+        when(platoRepository.findById(13L)).thenReturn(Optional.of(bebidaEnCarta));
+
+        platoService.retirarPlatoDeLaCarta(13L);
+
+        assertFalse(bebidaEnCarta.getEstaEnCarta());
+        verify(platoRepository).save(bebidaEnCarta);
+    }
+
+    @Test
+    @DisplayName("PU-18-03: Rechaza retirar un plato que ya está retirado")
+    void retirarPlato_yaRetirado_lanzaError() {
+
+        when(platoRepository.findById(20L)).thenReturn(Optional.of(entranteRetirado));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> platoService.retirarPlatoDeLaCarta(20L));
+        assertTrue(ex.getMessage().contains("ya está retirado"));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-18-04: Rechaza retirar un plato del chef")
+    void retirarPlato_delChef_lanzaOperacionNoPermitida() {
+
+        when(platoRepository.findById(30L)).thenReturn(Optional.of(entranteDelChef));
+
+        assertThrows(OperacionNoPermitidaException.class, () -> platoService.retirarPlatoDeLaCarta(30L));
+        verify(platoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("PU-18-05: Lanza RecursoNoEncontrado si el plato no existe")
+    void retirarPlato_inexistente_lanzaRecursoNoEncontrado() {
+
+        when(platoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNoEncontradoException.class, () -> platoService.retirarPlatoDeLaCarta(99L));
+        verify(platoRepository, never()).save(any());
     }
 }

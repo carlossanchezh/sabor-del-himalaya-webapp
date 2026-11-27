@@ -14,7 +14,9 @@ import es.upm.is2.sabordelhimalaya.model.Usuario;
 import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoMenuDiarioDTO;
 import es.upm.is2.sabordelhimalaya.dto.request.LineaPedidoPlatoDTO;
 import es.upm.is2.sabordelhimalaya.dto.response.ResumenPedidoDTO;
+import es.upm.is2.sabordelhimalaya.dto.session.PedidoTemporalDTO;
 
+import es.upm.is2.sabordelhimalaya.exception.OperacionNoPermitidaException;
 import es.upm.is2.sabordelhimalaya.exception.RecursoNoEncontradoException;
 
 import es.upm.is2.sabordelhimalaya.repository.*;
@@ -32,6 +34,9 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PedidoServiceImpl implements PedidoService {
+
+    // Minutos tras la realización del pedido durante los que se puede modificar
+    private static final int MINUTOS_MODIFICACION = 10;
 
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -179,33 +184,166 @@ public class PedidoServiceImpl implements PedidoService {
     }
 
     @Override
+    @Transactional
     public Pedido modificarPedido(Long idPedido, List<LineaPedidoPlatoDTO> lineasPlato, List<LineaPedidoMenuDiarioDTO> lineasMenu) {
-        // TODO (US-09): Validar que no hayan pasado 10 min. Borrar líneas antiguas, crear nuevas, recalcular total.
-        throw new UnsupportedOperationException("TODO US-09");
+
+        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        Pedido pedido = buscarPorId(idPedido);
+
+        // Pasados los 10 minutos (o si está cancelado) no se puede modificar
+        if (!sePuedeModificar(pedido)) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede modificar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+        }
+
+        // Validación inicial de las listas
+        List<LineaPedidoPlatoDTO> platos = (lineasPlato != null) ? lineasPlato : List.of();
+        List<LineaPedidoMenuDiarioDTO> menus = (lineasMenu != null) ? lineasMenu : List.of();
+
+        // Un pedido modificado no puede quedarse vacío
+        if (platos.isEmpty() && menus.isEmpty()) {
+            throw new IllegalArgumentException("El pedido no puede quedarse vacío. Si ya no lo quieres, elimínalo.");
+        }
+
+        // Se validan y construyen las nuevas líneas, recalculando el total
+        BigDecimal total = BigDecimal.ZERO;
+        List<LineaPedidoPlato> nuevasLineasPlato = new ArrayList<>();
+        for (LineaPedidoPlatoDTO dto : platos) {
+            LineaPedidoPlato linea = construirLineaPlato(dto);
+            linea.setPedido(pedido);
+            nuevasLineasPlato.add(linea);
+            total = total.add(subtotal(linea.getPrecioUnitario(), linea.getCantidad()));
+        }
+        List<LineaPedidoMenuDiario> nuevasLineasMenu = new ArrayList<>();
+        for (LineaPedidoMenuDiarioDTO dto : menus) {
+            LineaPedidoMenuDiario linea = construirLineaMenu(dto);
+            linea.setPedido(pedido);
+            nuevasLineasMenu.add(linea);
+            total = total.add(subtotal(linea.getPrecioUnitario(), linea.getCantidad()));
+        }
+
+        // Se borran las líneas antiguas y se guardan las nuevas
+        lineaPedidoPlatoRepository.deleteAll(lineaPedidoPlatoRepository.findByPedidoIdPedido(idPedido));
+        lineaPedidoMenuDiarioRepository.deleteAll(lineaPedidoMenuDiarioRepository.findByPedidoIdPedido(idPedido));
+        lineaPedidoPlatoRepository.saveAll(nuevasLineasPlato);
+        lineaPedidoMenuDiarioRepository.saveAll(nuevasLineasMenu);
+
+        // Se actualiza el importe del pedido (la fecha no cambia: el plazo cuenta desde su realización)
+        pedido.setImporteTotal(total.setScale(2, RoundingMode.HALF_UP));
+
+        return pedidoRepository.save(pedido);
     }
 
     @Override
+    public boolean sePuedeModificar(Pedido pedido) {
+
+        return pedido.getEstado() != EstadoPedido.CANCELADO
+                && pedido.getFechaHora() != null
+                && LocalDateTime.now().isBefore(pedido.getFechaHora().plusMinutes(MINUTOS_MODIFICACION));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PedidoTemporalDTO obtenerLineasDePedido(Long idPedido) {
+
+        // Comprueba que el pedido existe
+        buscarPorId(idPedido);
+
+        PedidoTemporalDTO lineas = new PedidoTemporalDTO();
+
+        // Líneas de platos
+        for (LineaPedidoPlato linea : lineaPedidoPlatoRepository.findByPedidoIdPedido(idPedido)) {
+            LineaPedidoPlatoDTO dto = new LineaPedidoPlatoDTO();
+            dto.setIdPlato(linea.getPlato().getIdPlato());
+            dto.setCantidad(linea.getCantidad());
+            lineas.getLineasPlato().add(dto);
+        }
+
+        // Líneas de menús del día
+        for (LineaPedidoMenuDiario linea : lineaPedidoMenuDiarioRepository.findByPedidoIdPedido(idPedido)) {
+            LineaPedidoMenuDiarioDTO dto = new LineaPedidoMenuDiarioDTO();
+            dto.setIdMenuDiario(linea.getMenuDiario().getIdMenuDiario());
+            dto.setIdEntrante(linea.getEntrante().getIdPlato());
+            dto.setIdPrincipal(linea.getPrincipal().getIdPlato());
+            dto.setIdPostre(linea.getPostre().getIdPlato());
+            dto.setIdBebida(linea.getBebida().getIdPlato());
+            dto.setCantidad(linea.getCantidad());
+            lineas.getLineasMenu().add(dto);
+        }
+
+        return lineas;
+    }
+
+    @Override
+    @Transactional
     public void cancelarPedido(Long idPedido) {
-        // TODO (US-10): Validar que no hayan pasado 10 min. Cambiar estado a CANCELADO.
-        throw new UnsupportedOperationException("TODO US-10");
+
+        // Se busca el pedido
+        Pedido pedido = buscarPorId(idPedido);
+
+        // Un pedido ya cancelado no se puede volver a eliminar
+        if (pedido.getEstado() == EstadoPedido.CANCELADO) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya está cancelado.");
+        }
+
+        // Pasados los 10 minutos no se puede eliminar
+        if (!sePuedeModificar(pedido)) {
+            throw new OperacionNoPermitidaException("El pedido #" + idPedido + " ya no se puede eliminar: han pasado más de " + MINUTOS_MODIFICACION + " minutos desde que se realizó.");
+        }
+
+        // El pedido pasa a CANCELADO y deja de aparecer como pedido activo
+        pedido.setEstado(EstadoPedido.CANCELADO);
+        pedidoRepository.save(pedido);
     }
 
     @Override
+    @Transactional
     public Pedido cambiarEstado(Long idPedido, EstadoPedido nuevoEstado) {
-        // TODO (US-11): Buscar pedido, actualizar estado y guardar.
-        throw new UnsupportedOperationException("TODO US-11");
+
+        // El nuevo estado es obligatorio
+        if (nuevoEstado == null) {
+            throw new IllegalArgumentException("Se debe indicar el nuevo estado del pedido.");
+        }
+
+        // Se busca el pedido (lanza RecursoNoEncontradoException si no existe)
+        Pedido pedido = buscarPorId(idPedido);
+
+        // Se actualiza y se almacena el nuevo estado
+        pedido.setEstado(nuevoEstado);
+
+        return pedidoRepository.save(pedido);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Pedido> listarPedidosDelDia(LocalDate fecha) {
-        // TODO (US-11): return pedidoRepository.findByFechaHoraBetween(fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
-        throw new UnsupportedOperationException("TODO US-11");
+
+        if (fecha == null) {
+            throw new IllegalArgumentException("Se debe indicar la fecha de la que listar los pedidos.");
+        }
+
+        // Pedidos cuyo fechaHora está dentro del día indicado
+        return pedidoRepository.findByFechaHoraBetween(fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
     }
 
     @Override
     public BigDecimal calcularFacturacion(LocalDate fecha) {
-        // TODO (US-19): Obtener pedidos del día y sumar importeTotal (excluyendo cancelados).
-        throw new UnsupportedOperationException("TODO US-19");
+
+        if (fecha == null) {
+            throw new IllegalArgumentException("Se debe indicar la fecha de la que calcular la facturación.");
+        }
+
+        // Obtiene todos los pedidos entregados y que están en el rango de la fecha
+        List<Pedido> pedidosFacturacion = pedidoRepository.findByEstadoAndFechaHoraBetween(EstadoPedido.ENTREGADO, fecha.atStartOfDay(), fecha.plusDays(1).atStartOfDay());
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        // Calcula la suma total de todos los pedidos
+        for (Pedido pedido : pedidosFacturacion) {
+            total = total.add(pedido.getImporteTotal());
+        }
+
+        // Redondea la facturación total
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override
@@ -213,12 +351,6 @@ public class PedidoServiceImpl implements PedidoService {
         // Obtener un pedido por su id
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el pedido con id " + id));
-    }
-
-    @Override
-    public List<Pedido> listarTodosPedidos() {
-        // TODO: return pedidoRepository.findAll();
-        throw new UnsupportedOperationException("TODO");
     }
 
     // ----------------------------------------------------------------

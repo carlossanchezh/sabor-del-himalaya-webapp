@@ -1,9 +1,172 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="es">
 <head>
-    <meta charset="UTF-8"><title>Title</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pedidos del día - Sabor del Himalaya</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .fila-pedido { cursor: pointer; }
+        .fila-pedido .flecha { display: inline-block; transition: transform .2s; }
+        .fila-pedido[aria-expanded="true"] .flecha { transform: rotate(90deg); }
+    </style>
+
 </head>
-<body>
+<body class="bg-light">
+
+<div th:replace="~{layout :: header}"></div>
+
+<main class="container-fluid px-3 my-4">
+
+    <!-- Mensajes de éxito o error (encuadrados) -->
+    <div class="d-flex justify-content-center">
+        <div style="width: 100%; max-width: 1400px;">
+            <div th:if="${mensaje}" class="alert alert-success alert-dismissible fade show mb-2" th:text="${mensaje}">Mensaje</div>
+            <div th:if="${error}" class="alert alert-danger alert-dismissible fade show mb-2" th:text="${error}">Error</div>
+        </div>
+    </div>
+
+    <!-- Card -->
+    <div class="d-flex justify-content-center">
+        <div class="card shadow-sm d-flex flex-column"
+             style="width: 100%; max-width: 1400px; max-height: 75vh;">
+
+            <!-- Cabecera -->
+            <div class="card-header bg-white flex-shrink-0">
+                <h1 class="h4 mb-0">Pedidos del día</h1>
+                <small class="text-muted">
+                    <span th:text="${#temporals.format(fecha, 'dd/MM/yyyy')}">00/00/0000</span>
+                </small>
+            </div>
+
+            <!-- Card-body -->
+            <div class="card-body d-flex flex-column p-0" style="min-height: 0;">
+
+                <!-- Pestañas -->
+                <ul class="nav nav-pills nav-fill flex-shrink-0 pt-2 px-3 pb-2 gap-2" role="tablist">
+                    <li class="nav-item" role="presentation" th:each="pestana, iter : ${pestanas}">
+                        <button class="nav-link" type="button" role="tab" data-bs-toggle="pill"
+                                th:classappend="${pestana['id'] == tabActiva} ? 'active' : ''"
+                                th:data-bs-target="'#pane-' + ${pestana['id']}">
+                            <span th:text="${pestana['etiqueta']}">Estado</span>
+                            <span th:if="${!#lists.isEmpty(pestana['pedidos'])}" class="ms-1">
+                                (<span class="fw-bold" th:text="${#lists.size(pestana['pedidos'])}">0</span>)
+                            </span>
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Contenido -->
+                <div class="tab-content" style="overflow-y: auto; min-height: 0; scrollbar-gutter: stable;">
+                    <div class="tab-pane fade" role="tabpanel" th:each="pestana, iter : ${pestanas}"
+                         th:classappend="${pestana['id'] == tabActiva} ? 'show active' : ''"
+                         th:id="'pane-' + ${pestana['id']}">
+
+                        <p th:if="${#lists.isEmpty(pestana['pedidos'])}"
+                           class="text-muted text-center py-5 mb-0">
+                            No hay pedidos en esta pestaña.
+                        </p>
+
+                        <table class="table table-hover align-middle mb-0"
+                               style="table-layout: fixed; width: 100%;"
+                               th:unless="${#lists.isEmpty(pestana['pedidos'])}">
+                            <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                                <th style="width: 10%;">Pedido</th>
+                                <th style="width: 8%;">Hora</th>
+                                <th style="width: 24%;">Dirección</th>
+                                <th class="text-end" style="width: 14%;">Importe</th>
+                                <th style="width: 14%;">Estado</th>
+                                <th class="text-end" style="width: 30%;">Cambiar estado</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <th:block th:each="pedido : ${pestana['pedidos']}">
+
+                                <!-- Fila principal del pedido -->
+
+                                <tr class="fila-pedido" aria-expanded="false"
+                                    th:data-destino="'#productos-' + ${pestana['id']} + '-' + ${pedido.idPedido}">
+                                    <td class="fw-semibold"><span class="flecha me-1">▸</span><span th:text="'#' + ${pedido.idPedido}">#0</span></td>
+                                    <td th:text="${#temporals.format(pedido.fechaHora, 'HH:mm')}">00:00</td>
+                                    <td style="word-break: break-word;" th:text="${pedido.direccionEntrega}">C/ ejemplo s/n</td>
+                                    <td class="text-end fw-semibold"
+                                        th:text="${#numbers.formatDecimal(pedido.importeTotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</td>
+
+                                    <td>
+                                        <span class="badge"
+                                              th:classappend="${pedido.estado.name() == 'ENTREGADO' ? 'text-bg-success' : (pedido.estado.name() == 'CANCELADO' ? 'text-bg-danger' : (pedido.estado.name() == 'RECIBIDO' ? 'border border-secondary text-secondary' : (pedido.estado.name() == 'EN_PREPARACION' ? 'text-bg-secondary' : 'text-bg-primary')))}"
+                                              th:text="${nombresEstado[pedido.estado.name()]}">Recibido</span>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <form th:action="@{/staff/pedidos/estado}" method="post"
+                                              class="d-flex justify-content-end align-items-center gap-2 m-0">
+                                            <input type="hidden" name="idPedido" th:value="${pedido.idPedido}">
+                                            <input type="hidden" name="tabActiva" th:value="${pestana['id']}">
+                                            <select name="nuevoEstado" class="form-select form-select-sm" style="width: auto;">
+                                                <option th:each="e : ${estados}" th:value="${e}"
+                                                        th:text="${nombresEstado[e.name()]}"
+                                                        th:selected="${e == pedido.estado}">Estado</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-primary btn-sm">Actualizar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <!-- Fila desplegable con los productos -->
+                                <tr>
+                                    <td colspan="6" class="p-0 border-0">
+                                        <div class="collapse" th:id="'productos-' + ${pestana['id']} + '-' + ${pedido.idPedido}">
+                                            <ul class="list-unstyled small mb-0 px-3 py-2 bg-body-tertiary">
+                                                <li th:each="linea : ${resumenesPedidos[pedido.idPedido].lineas}" class="mb-1">
+                                                    <span class="badge text-bg-light border me-2 fw-normal" th:text="${linea.cantidad} + 'x'">1x</span>
+                                                    <span th:text="${linea.nombre}">Plato</span>
+                                                    <span class="text-muted ms-1" th:if="${linea.detalle}" th:text="'(' + ${linea.detalle} + ')'"></span>
+                                                    <span class="float-end text-muted"
+                                                          th:text="${#numbers.formatDecimal(linea.subtotal, 1, 'POINT', 2, 'COMMA')} + ' €'">0,00 €</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            </th:block>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Desplegable de productos para cada pedido -->
+<script>
+    document.querySelectorAll('.fila-pedido').forEach(function (fila) {
+        var destino = document.querySelector(fila.dataset.destino);
+        var collapse = bootstrap.Collapse.getOrCreateInstance(destino, { toggle: false });
+
+        fila.addEventListener('click', function (e) {
+            // Si se pulsa el select, un botón o el formulario, no se despliega
+            if (e.target.closest('form, select, button, a, input')) return;
+            collapse.toggle();
+        });
+
+        // Gira la flecha según esté abierto o cerrado
+        destino.addEventListener('show.bs.collapse', function () {
+            fila.setAttribute('aria-expanded', 'true');
+        });
+        destino.addEventListener('hide.bs.collapse', function () {
+            fila.setAttribute('aria-expanded', 'false');
+        });
+    });
+</script>
 
 </body>
 </html>
